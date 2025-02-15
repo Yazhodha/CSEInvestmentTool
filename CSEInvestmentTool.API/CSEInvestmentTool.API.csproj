@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.6" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.3" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CSEInvestmentTool.Domain\CSEInvestmentTool.Domain.csproj" />
+    <ProjectReference Include="..\CSEInvestmentTool.Application\CSEInvestmentTool.Application.csproj" />
+    <ProjectReference Include="..\CSEInvestmentTool.Infrastructure\CSEInvestmentTool.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

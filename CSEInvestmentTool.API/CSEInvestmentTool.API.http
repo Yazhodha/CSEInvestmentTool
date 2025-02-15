@@ -1,0 +1,6 @@
+@CSEInvestmentTool.API_HostAddress = http://localhost:5277
+
+GET {{CSEInvestmentTool.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
