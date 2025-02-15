@@ -1,10 +1,13 @@
 ﻿@page "/"
-@using CSEInvestmentTool.Application.Services
 @using CSEInvestmentTool.Domain.Models
-@using CSEInvestmentTool.Infrastructure.Services
-@inject IDataCollectionService DataService
-@inject IStockScoringService ScoringService
+@using CSEInvestmentTool.Application.Services
+@using CSEInvestmentTool.Application.Interfaces
+@using Microsoft.Extensions.Logging
+
+@inject ILogger<Index> Logger
+@inject IStockScoreRepository ScoreRepository
 @inject IInvestmentAllocationService AllocationService
+@inject IInvestmentRecommendationRepository RecommendationRepository
 
 <div class="container mx-auto px-4">
     <h1 class="text-2xl font-bold mb-4">CSE Investment Recommendations</h1>
@@ -50,7 +53,7 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     @{
-                                        var score = _scores?.FirstOrDefault(s => s.StockId == recommendation.StockId);
+                                        var score = _scores.FirstOrDefault(s => s.StockId == recommendation.StockId);
                                         <div class="text-sm font-medium text-gray-900">@(score?.TotalScore.ToString("N1") ?? "N/A")</div>
                                     }
                                 </td>
@@ -67,31 +70,6 @@
                     </tbody>
                 </table>
             </div>
-
-            <div class="mt-8">
-                <h2 class="text-xl font-semibold mb-4">Investment Details</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    @foreach (var recommendation in _recommendations)
-                    {
-                        var score = _scores?.FirstOrDefault(s => s.StockId == recommendation.StockId);
-                        <div class="bg-white shadow rounded-lg p-4">
-                            <h3 class="font-medium text-lg mb-2">@recommendation.Stock?.Symbol</h3>
-                            <div class="grid grid-cols-2 gap-2 text-sm">
-                                <div>P/E Score:</div>
-                                <div>@(score?.PEScore.ToString("N1") ?? "N/A")</div>
-                                <div>ROE Score:</div>
-                                <div>@(score?.ROEScore.ToString("N1") ?? "N/A")</div>
-                                <div>Dividend Score:</div>
-                                <div>@(score?.DividendYieldScore.ToString("N1") ?? "N/A")</div>
-                                <div>Debt/Equity Score:</div>
-                                <div>@(score?.DebtEquityScore.ToString("N1") ?? "N/A")</div>
-                                <div>Profit Margin Score:</div>
-                                <div>@(score?.ProfitMarginScore.ToString("N1") ?? "N/A")</div>
-                            </div>
-                        </div>
-                    }
-                </div>
-            </div>
         }
         else
         {
@@ -99,7 +77,10 @@
                 <div class="flex">
                     <div class="ml-3">
                         <p class="text-sm text-yellow-700">
-                            No recommendations available at this time. Please try again later.
+                            No recommendations available. 
+                            <button @onclick="GenerateRecommendations" class="text-blue-600 hover:text-blue-800 underline">
+                                Generate Recommendations
+                            </button>
                         </p>
                     </div>
                 </div>
@@ -110,37 +91,66 @@
 
 @code {
     private bool _loading = true;
-    private List<Stock>? _stocks;
-    private List<StockScore>? _scores;
-    private List<InvestmentRecommendation>? _recommendations;
+    private List<StockScore> _scores = new();
+    private List<InvestmentRecommendation> _recommendations = new();
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
     {
         try
         {
             _loading = true;
             
-            // Get all stocks
-            _stocks = await DataService.GetAllStocksAsync();
-            
-            // Get fundamental data and calculate scores
-            _scores = new List<StockScore>();
-            foreach (var stock in _stocks)
-            {
-                var fundamentalData = await DataService.GetFundamentalDataAsync(stock.Symbol);
-                var score = ScoringService.CalculateScore(fundamentalData);
-                _scores.Add(score);
-            }
-            
-            // Calculate investment recommendations
-            _recommendations = AllocationService.CalculateInvestmentAllocations(
-                _scores,
-                DateTime.UtcNow.Date);
+            // Get latest recommendations
+            var recommendations = await RecommendationRepository.GetLatestRecommendationsAsync();
+            _recommendations = recommendations.ToList();
+
+            // Get scores for reference
+            _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
         }
         catch (Exception ex)
         {
-            // Handle error (show error message)
-            Console.Error.WriteLine(ex);
+            Logger.LogError(ex, "Error loading recommendations");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    protected async Task GenerateRecommendations()
+    {
+        try
+        {
+            _loading = true;
+
+            // Get latest scores
+            var scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
+
+            if (scores.Any())
+            {
+                // Generate new recommendations
+                var recommendations = AllocationService.CalculateInvestmentAllocations(
+                    scores,
+                    DateTime.UtcNow.Date);
+
+                // Save recommendations to database
+                foreach (var recommendation in recommendations)
+                {
+                    await RecommendationRepository.AddRecommendationAsync(recommendation);
+                }
+
+                // Reload data
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error generating recommendations");
         }
         finally
         {
