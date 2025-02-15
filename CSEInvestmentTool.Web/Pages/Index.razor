@@ -3,8 +3,8 @@
 @using CSEInvestmentTool.Domain.Models
 @using CSEInvestmentTool.Infrastructure.Services
 @inject IDataCollectionService DataService
-@inject StockScoringService ScoringService
-@inject InvestmentAllocationService AllocationService
+@inject IStockScoringService ScoringService
+@inject IInvestmentAllocationService AllocationService
 
 <div class="container mx-auto px-4">
     <h1 class="text-2xl font-bold mb-4">CSE Investment Recommendations</h1>

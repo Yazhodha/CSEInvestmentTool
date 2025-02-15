@@ -1,0 +1,163 @@
+﻿@page "/stocks"
+@using CSEInvestmentTool.Application.Services
+@using CSEInvestmentTool.Domain.Models
+@using CSEInvestmentTool.Application.Interfaces
+@inject IStockRepository StockRepository
+@inject IFundamentalDataRepository FundamentalRepository
+@inject IStockScoreRepository ScoreRepository
+@inject IStockScoringService ScoringService
+
+<PageTitle>CSE Stocks Analysis</PageTitle>
+
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold mb-6">CSE Stocks Analysis</h1>
+
+    @if (_loading)
+    {
+        <div class="flex justify-center items-center h-32">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+    }
+    else if (_stocks?.Any() != true)
+    {
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <div class="flex">
+                <div class="ml-3">
+                    <p class="text-sm text-yellow-700">
+                        No stocks found in the database.
+                    </p>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+            <table class="min-w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sector</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">P/E Ratio</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ROE</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    @foreach (var stock in _stocks)
+                    {
+                        var fundamentals = _fundamentalData.FirstOrDefault(f => f.StockId == stock.StockId);
+                        var score = _scores.FirstOrDefault(s => s.StockId == stock.StockId);
+
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">@stock.Symbol</div>
+                                <div class="text-sm text-gray-500">@stock.CompanyName</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">@stock.Sector</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    @(fundamentals?.PERatio?.ToString("N2") ?? "N/A")
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    @(fundamentals?.ROE?.ToString("N2") ?? "N/A")%
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                @if (score != null)
+                                {
+                                    <div class="text-sm font-medium @(score.TotalScore >= 70 ? "text-green-600" : score.TotalScore >= 50 ? "text-yellow-600" : "text-red-600")">
+                                        @score.TotalScore.ToString("N1")
+                                    </div>
+                                }
+                                else if (fundamentals != null)
+                                {
+                                    <button @onclick="() => CalculateScore(stock.StockId, fundamentals)" 
+                                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm">
+                                        Calculate Score
+                                    </button>
+                                }
+                                else
+                                {
+                                    <div class="text-sm text-gray-500">N/A</div>
+                                }
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <button @onclick="() => RefreshData(stock.StockId)" 
+                                        class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-1 px-2 rounded text-sm">
+                                    Refresh
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private IEnumerable<Stock> _stocks = Array.Empty<Stock>();
+    private IEnumerable<FundamentalData> _fundamentalData = Array.Empty<FundamentalData>();
+    private IEnumerable<StockScore> _scores = Array.Empty<StockScore>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+{
+    try
+    {
+        _loading = true;
+        
+        // Get all active stocks
+        _stocks = (await StockRepository.GetAllStocksAsync()).ToList();
+        
+        if (_stocks.Any())
+        {
+            // Get all fundamental data in a single query
+            var stockIds = _stocks.Select(s => s.StockId);
+            _fundamentalData = await FundamentalRepository.GetLatestFundamentalDataForStocksAsync(stockIds);
+
+            // Get all scores
+            _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
+        }
+    }
+    catch (Exception ex)
+    {
+        // TODO: Add proper error handling/display
+    }
+    finally
+    {
+        _loading = false;
+        StateHasChanged();
+    }
+}
+    private async Task RefreshData(int stockId)
+    {
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private async Task CalculateScore(int stockId, FundamentalData fundamentals)
+    {
+        try
+        {
+            var score = ScoringService.CalculateScore(fundamentals);
+            await ScoreRepository.AddStockScoreAsync(score);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            throw;
+        }
+    }
+}

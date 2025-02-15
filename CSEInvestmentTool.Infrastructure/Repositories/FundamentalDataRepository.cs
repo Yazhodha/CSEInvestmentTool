@@ -22,6 +22,15 @@ public class FundamentalDataRepository : IFundamentalDataRepository
             .ToListAsync();
     }
 
+    public async Task<List<FundamentalData>> GetLatestFundamentalDataForStocksAsync(IEnumerable<int> stockIds)
+    {
+        return await _context.FundamentalData
+            .Where(f => stockIds.Contains(f.StockId))
+            .GroupBy(f => f.StockId)
+            .Select(g => g.OrderByDescending(f => f.Date).First())
+            .ToListAsync();
+    }
+
     public async Task<FundamentalData?> GetLatestFundamentalDataForStockAsync(int stockId)
     {
         return await _context.FundamentalData
