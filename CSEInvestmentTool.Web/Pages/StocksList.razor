@@ -2,15 +2,28 @@
 @using CSEInvestmentTool.Application.Services
 @using CSEInvestmentTool.Domain.Models
 @using CSEInvestmentTool.Application.Interfaces
+
 @inject IStockRepository StockRepository
 @inject IFundamentalDataRepository FundamentalRepository
 @inject IStockScoreRepository ScoreRepository
 @inject IStockScoringService ScoringService
 
-<PageTitle>CSE Stocks Analysis</PageTitle>
-
-<div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">CSE Stocks Analysis</h1>
+<div class="space-y-6">
+    <div class="sm:flex sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">CSE Stocks Analysis</h1>
+            <p class="mt-2 text-sm text-gray-700">
+                Comprehensive analysis of stocks listed on the Colombo Stock Exchange
+            </p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+            <button @onclick="LoadData" 
+                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <span class="mr-2">↻</span>
+                Refresh Data
+            </button>
+        </div>
+    </div>
 
     @if (_loading)
     {
@@ -20,7 +33,7 @@
     }
     else if (_stocks?.Any() != true)
     {
-        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
             <div class="flex">
                 <div class="ml-3">
                     <p class="text-sm text-yellow-700">
@@ -32,80 +45,93 @@
     }
     else
     {
-        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
-            <table class="min-w-full">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sector</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">P/E Ratio</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ROE</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    @foreach (var stock in _stocks)
+        <!-- Sector Filter -->
+        <div class="bg-white p-4 rounded-lg shadow-sm">
+            <div class="flex items-center space-x-4">
+                <label class="text-sm font-medium text-gray-700">Filter by Sector:</label>
+                <select @bind="_selectedSector" class="mt-1 block w-64 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                    <option value="">All Sectors</option>
+                    @foreach (var sector in _sectors)
                     {
-                        var fundamentals = _fundamentalData.FirstOrDefault(f => f.StockId == stock.StockId);
-                        var score = _scores.FirstOrDefault(s => s.StockId == stock.StockId);
-
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-medium text-gray-900">@stock.Symbol</div>
-                                <div class="text-sm text-gray-500">@stock.CompanyName</div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900">@stock.Sector</div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900">
-                                    @(fundamentals?.PERatio?.ToString("N2") ?? "N/A")
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900">
-                                    @(fundamentals?.ROE?.ToString("N2") ?? "N/A")%
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                @if (score != null)
-                                {
-                                    <div class="text-sm font-medium @(score.TotalScore >= 70 ? "text-green-600" : score.TotalScore >= 50 ? "text-yellow-600" : "text-red-600")">
-                                        @score.TotalScore.ToString("N1")
-                                    </div>
-                                }
-                                else if (fundamentals != null)
-                                {
-                                    <button @onclick="() => CalculateScore(stock.StockId, fundamentals)" 
-                                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm">
-                                        Calculate Score
-                                    </button>
-                                }
-                                else
-                                {
-                                    <div class="text-sm text-gray-500">N/A</div>
-                                }
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <button @onclick="() => RefreshData(stock.StockId)" 
-                                        class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-1 px-2 rounded text-sm">
-                                    Refresh
-                                </button>
-                            </td>
-                        </tr>
+                        <option value="@sector">@sector</option>
                     }
-                </tbody>
-            </table>
+                </select>
+            </div>
+        </div>
+
+        <!-- Stocks Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            @foreach (var stock in GetFilteredStocks())
+            {
+                var fundamentals = _fundamentalData.FirstOrDefault(f => f.StockId == stock.StockId);
+                var score = _scores.FirstOrDefault(s => s.StockId == stock.StockId);
+
+                <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900">@stock.Symbol</h3>
+                                <p class="text-sm text-gray-500">@stock.CompanyName</p>
+                            </div>
+                            @if (score != null)
+                            {
+                                <div class="@GetScoreBadgeClass(score.TotalScore)">
+                                    @score.TotalScore.ToString("N1")
+                                </div>
+                            }
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <p class="text-xs text-gray-500">P/E Ratio</p>
+                                <p class="text-sm font-semibold">
+                                    @(fundamentals?.PERatio?.ToString("N2") ?? "N/A")
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">ROE</p>
+                                <p class="text-sm font-semibold">
+                                    @(fundamentals?.ROE != null ? $"{fundamentals.ROE:N2}%" : "N/A")
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Dividend Yield</p>
+                                <p class="text-sm font-semibold">
+                                    @(fundamentals?.DividendYield != null ? $"{fundamentals.DividendYield:N2}%" : "N/A")
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Market Cap</p>
+                                <p class="text-sm font-semibold">
+                                    @(fundamentals?.MarketCap != null ? $"{fundamentals.MarketCap / 1_000_000_000:N2}B" : "N/A")
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center pt-4 border-t">
+                            <span class="text-sm text-gray-500">@stock.Sector</span>
+                            @if (fundamentals != null && score == null)
+                            {
+                                <button @onclick="() => CalculateScore(stock.StockId, fundamentals)"
+                                        class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                    Calculate Score
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     }
 </div>
 
 @code {
     private bool _loading = true;
-    private IEnumerable<Stock> _stocks = Array.Empty<Stock>();
-    private IEnumerable<FundamentalData> _fundamentalData = Array.Empty<FundamentalData>();
-    private IEnumerable<StockScore> _scores = Array.Empty<StockScore>();
+    private List<Stock> _stocks = new();
+    private List<FundamentalData> _fundamentalData = new();
+    private List<StockScore> _scores = new();
+    private string _selectedSector = "";
+    private List<string> _sectors = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -113,38 +139,66 @@
     }
 
     private async Task LoadData()
-{
-    try
     {
-        _loading = true;
-        
-        // Get all active stocks
-        _stocks = (await StockRepository.GetAllStocksAsync()).ToList();
-        
-        if (_stocks.Any())
+        try
         {
-            // Get all fundamental data in a single query
-            var stockIds = _stocks.Select(s => s.StockId);
-            _fundamentalData = await FundamentalRepository.GetLatestFundamentalDataForStocksAsync(stockIds);
+            _loading = true;
+            StateHasChanged();
+            
+            // Get all active stocks
+            _stocks = (await StockRepository.GetAllStocksAsync()).ToList();
+            
+            if (_stocks.Any())
+            {
+                // Get fundamental data
+                _fundamentalData = new List<FundamentalData>();
+                foreach (var stock in _stocks)
+                {
+                    var fundamentalData = await FundamentalRepository.GetLatestFundamentalDataForStockAsync(stock.StockId);
+                    if (fundamentalData != null)
+                    {
+                        _fundamentalData.Add(fundamentalData);
+                    }
+                }
 
-            // Get all scores
-            _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
+                // Get scores
+                _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
+
+                // Get unique sectors
+                _sectors = _stocks.Select(s => s.Sector)
+                                .Where(s => !string.IsNullOrEmpty(s))
+                                .Distinct()
+                                .OrderBy(s => s)
+                                .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
         }
     }
-    catch (Exception ex)
+
+    private IEnumerable<Stock> GetFilteredStocks()
     {
-        // TODO: Add proper error handling/display
+        return string.IsNullOrEmpty(_selectedSector)
+            ? _stocks
+            : _stocks.Where(s => s.Sector == _selectedSector);
     }
-    finally
+
+    private string GetScoreBadgeClass(decimal score)
     {
-        _loading = false;
-        StateHasChanged();
-    }
-}
-    private async Task RefreshData(int stockId)
-    {
-        await LoadData();
-        StateHasChanged();
+        var baseClass = "px-2 py-1 text-xs font-medium rounded-full ";
+        return score switch
+        {
+            >= 70 => baseClass + "bg-green-100 text-green-800",
+            >= 50 => baseClass + "bg-yellow-100 text-yellow-800",
+            _ => baseClass + "bg-red-100 text-red-800"
+        };
     }
 
     private async Task CalculateScore(int stockId, FundamentalData fundamentals)
@@ -157,7 +211,7 @@
         }
         catch (Exception ex)
         {
-            throw;
+            Console.WriteLine($"Error calculating score: {ex.Message}");
         }
     }
 }

@@ -1,0 +1,89 @@
+﻿@using CSEInvestmentTool.Domain.Models
+
+<div class="@($"rounded-lg border p-6 {GetScoreBackgroundColor()} transition-all duration-200 hover:shadow-md")">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="text-lg font-bold text-gray-900">@Stock.Symbol</h3>
+            <p class="text-sm text-gray-500">@Stock.CompanyName</p>
+        </div>
+        @if (Score != null)
+        {
+            <div class="@($"px-3 py-1 rounded-full text-sm font-medium {GetScoreTextColor()}")">
+                Score: @Score.TotalScore.ToString("N1")
+            </div>
+        }
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+            <p class="text-sm text-gray-500">P/E Ratio</p>
+            <p class="text-lg font-semibold">
+                @(FundamentalData?.PERatio?.ToString("N2") ?? "N/A")
+            </p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500">ROE</p>
+            <p class="text-lg font-semibold">
+                @(FundamentalData?.ROE != null ? $"{FundamentalData.ROE:N2}%" : "N/A")
+            </p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500">Dividend Yield</p>
+            <p class="text-lg font-semibold">
+                @(FundamentalData?.DividendYield != null ? $"{FundamentalData.DividendYield:N2}%" : "N/A")
+            </p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500">Market Cap</p>
+            <p class="text-lg font-semibold">
+                @(FundamentalData?.MarketCap != null ? $"{FundamentalData.MarketCap / 1_000_000_000:N2}B" : "N/A")
+            </p>
+        </div>
+    </div>
+
+    <div class="border-t pt-4">
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">@Stock.Sector</span>
+            <span class="@GetTrendIconClass()"></span>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Stock Stock { get; set; } = default!;
+    [Parameter] public FundamentalData? FundamentalData { get; set; }
+    [Parameter] public StockScore? Score { get; set; }
+
+    private string GetScoreBackgroundColor()
+    {
+        if (Score == null) return "bg-gray-100";
+        return Score.TotalScore switch
+        {
+            >= 70 => "bg-green-50 border-green-200",
+            >= 50 => "bg-yellow-50 border-yellow-200",
+            _ => "bg-red-50 border-red-200"
+        };
+    }
+
+    private string GetScoreTextColor()
+    {
+        if (Score == null) return "text-gray-500";
+        return Score.TotalScore switch
+        {
+            >= 70 => "text-green-700",
+            >= 50 => "text-yellow-700",
+            _ => "text-red-700"
+        };
+    }
+
+    private string GetTrendIconClass()
+    {
+        if (Score == null) return "text-gray-400";
+        return Score.TotalScore switch
+        {
+            >= 70 => "text-green-500",
+            >= 50 => "text-yellow-500",
+            _ => "text-red-500"
+        };
+    }
+}
