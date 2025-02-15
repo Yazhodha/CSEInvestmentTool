@@ -482,3 +482,8 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Build and debug folders
+[Oo]bj/
+[Dd]ebug/
+*.obj/
