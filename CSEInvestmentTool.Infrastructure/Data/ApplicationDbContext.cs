@@ -19,41 +19,21 @@ public class ApplicationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure PostgreSQL-specific settings
-        modelBuilder.Entity<Stock>(entity =>
-        {
-            entity.ToTable("stocks");
-            entity.HasKey(e => e.StockId);
-            entity.Property(e => e.Symbol).HasMaxLength(10);
-            entity.Property(e => e.CompanyName).HasMaxLength(100);
-            entity.Property(e => e.Sector).HasMaxLength(50);
-        });
+        // Configure unique constraints and indexes
+        modelBuilder.Entity<Stock>()
+            .HasIndex(s => s.Symbol)
+            .IsUnique();
 
-        modelBuilder.Entity<FundamentalData>(entity =>
-        {
-            entity.ToTable("fundamental_data");
-            entity.HasKey(e => e.FundamentalId);
-            entity.HasOne(d => d.Stock)
-                  .WithMany()
-                  .HasForeignKey(d => d.StockId);
-        });
+        modelBuilder.Entity<FundamentalData>()
+            .HasIndex(f => new { f.StockId, f.Date })
+            .IsUnique();
 
-        modelBuilder.Entity<StockScore>(entity =>
-        {
-            entity.ToTable("stock_scores");
-            entity.HasKey(e => e.ScoreId);
-            entity.HasOne(d => d.Stock)
-                  .WithMany()
-                  .HasForeignKey(d => d.StockId);
-        });
+        modelBuilder.Entity<StockScore>()
+            .HasIndex(s => new { s.StockId, s.ScoreDate })
+            .IsUnique();
 
-        modelBuilder.Entity<InvestmentRecommendation>(entity =>
-        {
-            entity.ToTable("investment_recommendations");
-            entity.HasKey(e => e.RecommendationId);
-            entity.HasOne(d => d.Stock)
-                  .WithMany()
-                  .HasForeignKey(d => d.StockId);
-        });
+        modelBuilder.Entity<InvestmentRecommendation>()
+            .HasIndex(r => new { r.StockId, r.RecommendationDate })
+            .IsUnique();
     }
 }
