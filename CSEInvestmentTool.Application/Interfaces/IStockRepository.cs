@@ -9,4 +9,5 @@ public interface IStockRepository
     Task<Stock?> GetStockBySymbolAsync(string symbol);
     Task AddStockAsync(Stock stock);
     Task UpdateStockAsync(Stock stock);
+    Task DeleteStockAsync(int id);
 }

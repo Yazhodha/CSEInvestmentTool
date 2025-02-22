@@ -44,4 +44,15 @@ public class StockRepository : IStockRepository
         _context.Stocks.Update(stock);
         await _context.SaveChangesAsync();
     }
+
+    public async Task DeleteStockAsync(int id)
+    {
+        var stock = await _context.Stocks.FindAsync(id);
+        if (stock != null)
+        {
+            stock.IsActive = false;
+            stock.LastUpdated = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+    }
 }
