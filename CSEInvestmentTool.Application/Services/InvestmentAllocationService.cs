@@ -1,6 +1,6 @@
 using CSEInvestmentTool.Domain.Models;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace CSEInvestmentTool.Application.Services;
 
@@ -15,7 +15,7 @@ public class InvestmentAllocationService : IInvestmentAllocationService
 {
     private readonly ILogger<InvestmentAllocationService> _logger;
     private readonly IConfiguration _configuration;
-    
+
     // Configuration constants with default values
     private readonly decimal _monthlyInvestmentAmount;
     private readonly int _maxStocks;
@@ -47,23 +47,26 @@ public class InvestmentAllocationService : IInvestmentAllocationService
         try
         {
             _logger.LogInformation("Calculating investment allocations for {Count} stocks on {Date}",
-                rankedStocks.Count, recommendationDate);
+            rankedStocks.Count, recommendationDate);
 
             var recommendations = new List<InvestmentRecommendation>();
 
-            if (!rankedStocks.Any())
+            // Filter out scores of inactive stocks
+            var activeStocks = rankedStocks.Where(s => s.Stock?.IsActive == true).ToList();
+
+            if (activeStocks.Count == 0)
             {
-                _logger.LogWarning("No stocks provided for allocation calculation");
+                _logger.LogWarning("No active stocks provided for allocation calculation");
                 return recommendations;
             }
 
             // Take top ranked stocks
-            var topStocks = rankedStocks
+            var topStocks = activeStocks
                 .OrderByDescending(s => s.TotalScore)
                 .Take(_maxStocks)
                 .ToList();
 
-            _logger.LogInformation("Selected top {Count} stocks for investment", topStocks.Count);
+            _logger.LogInformation("Selected top {Count} active stocks for investment", topStocks.Count);
 
             // Calculate allocation based on scores
             decimal totalScore = topStocks.Sum(s => s.TotalScore);

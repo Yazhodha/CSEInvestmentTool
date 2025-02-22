@@ -64,9 +64,10 @@ namespace CSEInvestmentTool.Web.Pages
 
         private IEnumerable<Stock> GetFilteredStocks()
         {
+            var activeStocks = _stocks.Where(s => s.IsActive);
             return string.IsNullOrEmpty(_selectedSector)
-                ? _stocks
-                : _stocks.Where(s => s.Sector == _selectedSector);
+                ? activeStocks
+                : activeStocks.Where(s => s.Sector == _selectedSector);
         }
 
         private string GetScoreBadgeClass(decimal score)

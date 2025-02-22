@@ -41,7 +41,29 @@ public class FundamentalDataRepository : IFundamentalDataRepository
 
     public async Task AddFundamentalDataAsync(FundamentalData data)
     {
-        await _context.FundamentalData.AddAsync(data);
+        // Check if fundamental data exists for this stock and date
+        var existingData = await _context.FundamentalData
+            .FirstOrDefaultAsync(f => f.StockId == data.StockId && f.Date.Date == data.Date.Date);
+
+        if (existingData != null)
+        {
+            // Update existing fundamental data
+            existingData.MarketPrice = data.MarketPrice;
+            existingData.NAV = data.NAV;
+            existingData.EPS = data.EPS;
+            existingData.AnnualDividend = data.AnnualDividend;
+            existingData.TotalLiabilities = data.TotalLiabilities;
+            existingData.TotalEquity = data.TotalEquity;
+            existingData.LastUpdated = DateTime.UtcNow;
+
+            _context.FundamentalData.Update(existingData);
+        }
+        else
+        {
+            // Add new fundamental data
+            await _context.FundamentalData.AddAsync(data);
+        }
+
         await _context.SaveChangesAsync();
     }
 }

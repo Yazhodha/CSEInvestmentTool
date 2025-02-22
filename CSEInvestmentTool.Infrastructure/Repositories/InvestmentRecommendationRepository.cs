@@ -26,7 +26,7 @@ public class InvestmentRecommendationRepository : IInvestmentRecommendationRepos
             .MaxAsync(r => r.RecommendationDate);
 
         return await _context.InvestmentRecommendations
-            .Where(r => r.RecommendationDate == latestDate)
+            .Where(r => r.RecommendationDate == latestDate && r.Stock!.IsActive)
             .Include(r => r.Stock)
             .OrderByDescending(r => r.RecommendedAmount)
             .ToListAsync();
