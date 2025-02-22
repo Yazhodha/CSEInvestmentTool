@@ -80,20 +80,6 @@ namespace CSEInvestmentTool.Web.Pages
             };
         }
 
-        private async Task CalculateScore(int stockId, FundamentalData fundamentals)
-        {
-            try
-            {
-                var score = ScoringService.CalculateScore(fundamentals);
-                await ScoreRepository.AddStockScoreAsync(score);
-                await LoadData();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error calculating score: {ex.Message}");
-            }
-        }
-
         private void AddNewStock()
         {
             Navigation.NavigateTo("/stocks/add");
