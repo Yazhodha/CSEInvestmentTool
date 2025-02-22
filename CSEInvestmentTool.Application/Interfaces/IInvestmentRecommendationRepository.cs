@@ -6,4 +6,5 @@ public interface IInvestmentRecommendationRepository
 {
     Task<IEnumerable<InvestmentRecommendation>> GetLatestRecommendationsAsync();
     Task AddRecommendationAsync(InvestmentRecommendation recommendation);
+    Task<bool> HasRecommendationForStockOnDateAsync(int stockId, DateTime date);
 }
