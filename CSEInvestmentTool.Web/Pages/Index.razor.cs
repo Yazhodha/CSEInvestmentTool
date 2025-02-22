@@ -18,29 +18,44 @@ namespace CSEInvestmentTool.Web.Pages
             try
             {
                 _loading = true;
+
                 // Get latest scores
                 _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
 
-                // Always generate fresh recommendations based on current scores
+                // Calculate fresh recommendations based on current scores
                 if (_scores.Any())
                 {
                     var recommendations = AllocationService.CalculateInvestmentAllocations(
                         _scores,
                         DateTime.UtcNow.Date);
 
-                    // Save recommendations
+                    // Save each recommendation
                     foreach (var recommendation in recommendations)
                     {
-                        await RecommendationRepository.AddRecommendationAsync(recommendation);
+                        try
+                        {
+                            await RecommendationRepository.AddRecommendationAsync(recommendation);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogWarning(ex, "Error saving recommendation for stock {StockId}", recommendation.StockId);
+                            // Continue with other recommendations even if one fails
+                        }
                     }
 
                     // Get the latest recommendations after saving
                     _recommendations = (await RecommendationRepository.GetLatestRecommendationsAsync()).ToList();
                 }
+                else
+                {
+                    _recommendations = new List<InvestmentRecommendation>();
+                }
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Error loading recommendations");
+                // Even if there's an error, try to get existing recommendations
+                _recommendations = (await RecommendationRepository.GetLatestRecommendationsAsync()).ToList();
             }
             finally
             {

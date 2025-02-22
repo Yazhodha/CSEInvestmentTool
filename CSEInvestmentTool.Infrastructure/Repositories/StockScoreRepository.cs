@@ -20,7 +20,7 @@ public class StockScoreRepository : IStockScoreRepository
             .MaxAsync(s => s.ScoreDate);
 
         return await _context.StockScores
-            .Where(s => s.ScoreDate == latestDate)
+            .Where(s => s.ScoreDate == latestDate && s.Stock!.IsActive)
             .Include(s => s.Stock)
             .OrderByDescending(s => s.TotalScore)
             .ToListAsync();
@@ -36,7 +36,30 @@ public class StockScoreRepository : IStockScoreRepository
 
     public async Task AddStockScoreAsync(StockScore score)
     {
-        await _context.StockScores.AddAsync(score);
+        // Check if a score exists for this stock and date
+        var existingScore = await _context.StockScores
+            .FirstOrDefaultAsync(s => s.StockId == score.StockId && s.ScoreDate.Date == score.ScoreDate.Date);
+
+        if (existingScore != null)
+        {
+            // Update existing score
+            existingScore.PEScore = score.PEScore;
+            existingScore.ROEScore = score.ROEScore;
+            existingScore.DividendYieldScore = score.DividendYieldScore;
+            existingScore.DebtEquityScore = score.DebtEquityScore;
+            existingScore.ProfitMarginScore = score.ProfitMarginScore;
+            existingScore.TotalScore = score.TotalScore;
+            existingScore.Rank = score.Rank;
+            existingScore.LastUpdated = DateTime.UtcNow;
+
+            _context.StockScores.Update(existingScore);
+        }
+        else
+        {
+            // Add new score
+            await _context.StockScores.AddAsync(score);
+        }
+
         await _context.SaveChangesAsync();
     }
 }

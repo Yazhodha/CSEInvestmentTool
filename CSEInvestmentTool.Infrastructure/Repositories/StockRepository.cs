@@ -33,10 +33,35 @@ public class StockRepository : IStockRepository
             .FirstOrDefaultAsync(s => s.Symbol == symbol);
     }
 
-    public async Task AddStockAsync(Stock stock)
+    public async Task<Stock> AddStockAsync(Stock stock)
     {
+        // Check for any existing stock with this symbol (case-insensitive)
+        var existingStock = await _context.Stocks
+            .FirstOrDefaultAsync(s => s.Symbol.ToUpper() == stock.Symbol.ToUpper());
+
+        if (existingStock != null)
+        {
+            if (!existingStock.IsActive)
+            {
+                // Reactivate and update the existing stock
+                existingStock.IsActive = true;
+                existingStock.CompanyName = stock.CompanyName;
+                existingStock.Sector = stock.Sector;
+                existingStock.LastUpdated = DateTime.UtcNow;
+                _context.Stocks.Update(existingStock);
+                await _context.SaveChangesAsync();
+                return existingStock;
+            }
+            else
+            {
+                throw new InvalidOperationException($"Stock with symbol {stock.Symbol} already exists and is active.");
+            }
+        }
+
+        // Add new stock
         await _context.Stocks.AddAsync(stock);
         await _context.SaveChangesAsync();
+        return stock;
     }
 
     public async Task UpdateStockAsync(Stock stock)
@@ -47,6 +72,18 @@ public class StockRepository : IStockRepository
 
     public async Task DeleteStockAsync(int id)
     {
+        // Find all recommendations for this stock first
+        var recommendations = await _context.InvestmentRecommendations
+            .Where(r => r.StockId == id)
+            .ToListAsync();
+
+        if (recommendations.Any())
+        {
+            _context.InvestmentRecommendations.RemoveRange(recommendations);
+            await _context.SaveChangesAsync();
+        }
+
+        // Then handle the stock
         var stock = await _context.Stocks.FindAsync(id);
         if (stock != null)
         {
