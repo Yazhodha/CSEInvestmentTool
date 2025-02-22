@@ -18,13 +18,25 @@ namespace CSEInvestmentTool.Web.Pages
             try
             {
                 _loading = true;
-
-                // Get latest recommendations
-                var recommendations = await RecommendationRepository.GetLatestRecommendationsAsync();
-                _recommendations = recommendations.ToList();
-
-                // Get scores for reference
+                // Get latest scores
                 _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
+
+                // Always generate fresh recommendations based on current scores
+                if (_scores.Any())
+                {
+                    var recommendations = AllocationService.CalculateInvestmentAllocations(
+                        _scores,
+                        DateTime.UtcNow.Date);
+
+                    // Save recommendations
+                    foreach (var recommendation in recommendations)
+                    {
+                        await RecommendationRepository.AddRecommendationAsync(recommendation);
+                    }
+
+                    // Get the latest recommendations after saving
+                    _recommendations = (await RecommendationRepository.GetLatestRecommendationsAsync()).ToList();
+                }
             }
             catch (Exception ex)
             {
@@ -42,23 +54,7 @@ namespace CSEInvestmentTool.Web.Pages
             {
                 _loading = true;
 
-                var scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
-
-                if (scores.Any())
-                {
-                    var recommendations = AllocationService.CalculateInvestmentAllocations(
-                        scores,
-                        DateTime.UtcNow.Date);
-
-                    // Save recommendations to database
-                    foreach (var recommendation in recommendations)
-                    {
-                        await RecommendationRepository.AddRecommendationAsync(recommendation);
-                    }
-
-                    // Reload data
-                    await LoadData();
-                }
+                await LoadData();
             }
             catch (Exception ex)
             {

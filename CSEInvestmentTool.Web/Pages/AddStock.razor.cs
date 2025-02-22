@@ -51,20 +51,9 @@ namespace CSEInvestmentTool.Web.Pages
                 // Add the fundamental data
                 await FundamentalRepository.AddFundamentalDataAsync(_stockEntry.Fundamentals);
 
-                // Calculate score
+                // Calculate and save the score automatically
                 var score = ScoringService.CalculateScore(_stockEntry.Fundamentals);
                 await ScoreRepository.AddStockScoreAsync(score);
-
-                // Calculate recommendation for the new stock
-                var recommendations = AllocationService.CalculateInvestmentAllocations(
-                    new List<StockScore> { score },
-                    DateTime.UtcNow.Date);
-
-                // Save each recommendation
-                foreach (var recommendation in recommendations)
-                {
-                    await RecommendationRepository.AddRecommendationAsync(recommendation);
-                }
 
                 Logger.LogInformation("Successfully added new stock: {Symbol} with automatic score calculation",
                     _stockEntry.Stock.Symbol);
