@@ -16,27 +16,42 @@
 
     <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
-            <p class="text-sm text-gray-500">P/E Ratio</p>
+            <p class="text-sm text-gray-500">P/BV</p>
             <p class="text-lg font-semibold">
+                @(FundamentalData?.PBV?.ToString("N2") ?? "N/A")
+            </p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500">Return</p>
+            <p class="text-lg font-semibold">
+                @(FundamentalData?.Return != null ? $"{FundamentalData.Return:N2}%" : "N/A")
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-4 pt-4 border-t">
+        <div>
+            <p class="text-xs text-gray-500">P/E Ratio</p>
+            <p class="text-sm font-semibold">
                 @(FundamentalData?.PERatio?.ToString("N2") ?? "N/A")
             </p>
         </div>
         <div>
-            <p class="text-sm text-gray-500">ROE</p>
-            <p class="text-lg font-semibold">
+            <p class="text-xs text-gray-500">ROE</p>
+            <p class="text-sm font-semibold">
                 @(FundamentalData?.ROE != null ? $"{FundamentalData.ROE:N2}%" : "N/A")
             </p>
         </div>
         <div>
-            <p class="text-sm text-gray-500">Dividend Yield</p>
-            <p class="text-lg font-semibold">
+            <p class="text-xs text-gray-500">Dividend Yield</p>
+            <p class="text-sm font-semibold">
                 @(FundamentalData?.DividendYield != null ? $"{FundamentalData.DividendYield:N2}%" : "N/A")
             </p>
         </div>
         <div>
-            <p class="text-sm text-gray-500">Market Cap</p>
-            <p class="text-lg font-semibold">
-                @(FundamentalData?.MarketCap != null ? $"{FundamentalData.MarketCap / 1_000_000_000:N2}B" : "N/A")
+            <p class="text-xs text-gray-500">Debt/Equity</p>
+            <p class="text-sm font-semibold">
+                @(FundamentalData?.DebtToEquityRatio?.ToString("N2") ?? "N/A")
             </p>
         </div>
     </div>
@@ -49,41 +64,3 @@
     </div>
 </div>
 
-@code {
-    [Parameter] public Stock Stock { get; set; } = default!;
-    [Parameter] public FundamentalData? FundamentalData { get; set; }
-    [Parameter] public StockScore? Score { get; set; }
-
-    private string GetScoreBackgroundColor()
-    {
-        if (Score == null) return "bg-gray-100";
-        return Score.TotalScore switch
-        {
-            >= 70 => "bg-green-50 border-green-200",
-            >= 50 => "bg-yellow-50 border-yellow-200",
-            _ => "bg-red-50 border-red-200"
-        };
-    }
-
-    private string GetScoreTextColor()
-    {
-        if (Score == null) return "text-gray-500";
-        return Score.TotalScore switch
-        {
-            >= 70 => "text-green-700",
-            >= 50 => "text-yellow-700",
-            _ => "text-red-700"
-        };
-    }
-
-    private string GetTrendIconClass()
-    {
-        if (Score == null) return "text-gray-400";
-        return Score.TotalScore switch
-        {
-            >= 70 => "text-green-500",
-            >= 50 => "text-yellow-500",
-            _ => "text-red-500"
-        };
-    }
-}

@@ -2,11 +2,13 @@
 @using CSEInvestmentTool.Application.Services
 @using CSEInvestmentTool.Domain.Models
 @using CSEInvestmentTool.Application.Interfaces
+@using Microsoft.AspNetCore.Components
 
 @inject IStockRepository StockRepository
 @inject IFundamentalDataRepository FundamentalRepository
 @inject IStockScoreRepository ScoreRepository
 @inject IStockScoringService ScoringService
+@inject NavigationManager Navigation
 
 <div class="space-y-6">
     <div class="sm:flex sm:items-center sm:justify-between">
@@ -16,9 +18,14 @@
                 Comprehensive analysis of stocks listed on the Colombo Stock Exchange
             </p>
         </div>
-        <div class="mt-4 sm:mt-0">
+        <div class="mt-4 sm:mt-0 space-x-4">
+            <button @onclick="AddNewStock"
+                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                <span class="mr-2">+</span>
+                Add Stock
+            </button>
             <button @onclick="LoadData"
-                class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                 <span class="mr-2">↻</span>
                 Refresh Data
             </button>
@@ -38,6 +45,10 @@
                 <div class="ml-3">
                     <p class="text-sm text-yellow-700">
                         No stocks found in the database.
+                        <button @onclick="AddNewStock"
+                                class="text-indigo-600 hover:text-indigo-800 underline">
+                            Add your first stock
+                        </button>
                     </p>
                 </div>
             </div>
@@ -50,7 +61,7 @@
             <div class="flex items-center space-x-4">
                 <label class="text-sm font-medium text-gray-700">Filter by Sector:</label>
                 <select @bind="_selectedSector"
-                    class="mt-1 block w-64 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        class="mt-1 block w-64 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                     <option value="">All Sectors</option>
                     @foreach (var sector in _sectors)
                     {
@@ -84,6 +95,33 @@
 
                         <div class="grid grid-cols-2 gap-4 mb-4">
                             <div>
+                                <p class="text-xs text-gray-500">Market Price</p>
+                                <p class="text-sm font-semibold">
+                                    @(fundamentals?.MarketPrice.ToString("N2") ?? "N/A") LKR
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">NAV</p>
+                                <p class="text-sm font-semibold">
+                                    @(fundamentals?.NAV.ToString("N2") ?? "N/A") LKR
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">EPS</p>
+                                <p class="text-sm font-semibold">
+                                    @(fundamentals?.EPS.ToString("N2") ?? "N/A") LKR
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Annual Dividend</p>
+                                <p class="text-sm font-semibold">
+                                    @(fundamentals?.AnnualDividend.ToString("N2") ?? "N/A") LKR
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-4 pt-4 border-t">
+                            <div>
                                 <p class="text-xs text-gray-500">P/E Ratio</p>
                                 <p class="text-sm font-semibold">
                                     @(fundamentals?.PERatio?.ToString("N2") ?? "N/A")
@@ -102,22 +140,21 @@
                                 </p>
                             </div>
                             <div>
-                                <p class="text-xs text-gray-500">Market Cap</p>
+                                <p class="text-xs text-gray-500">Debt/Equity</p>
                                 <p class="text-sm font-semibold">
-                                    @(fundamentals?.MarketCap != null ? $"{fundamentals.MarketCap / 1_000_000_000:N2}B" : "N/A")
+                                    @(fundamentals?.DebtToEquityRatio?.ToString("N2") ?? "N/A")
                                 </p>
                             </div>
                         </div>
 
                         <div class="flex justify-between items-center pt-4 border-t">
                             <span class="text-sm text-gray-500">@stock.Sector</span>
-                            @if (fundamentals != null && score == null)
-                            {
-                                <button @onclick="() => CalculateScore(stock.StockId, fundamentals)"
-                                    class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                                    Calculate Score
+                            <div class="space-x-2">
+                                <button @onclick="() => NavigateToDetails(stock.StockId)"
+                                        class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    View Details
                                 </button>
-                            }
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -126,94 +163,3 @@
     }
 </div>
 
-@code {
-    private bool _loading = true;
-    private List<Stock> _stocks = new();
-    private List<FundamentalData> _fundamentalData = new();
-    private List<StockScore> _scores = new();
-    private string _selectedSector = "";
-    private List<string> _sectors = new();
-
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadData();
-    }
-
-    private async Task LoadData()
-    {
-        try
-        {
-            _loading = true;
-            StateHasChanged();
-
-            // Get all active stocks
-            _stocks = (await StockRepository.GetAllStocksAsync()).ToList();
-
-            if (_stocks.Any())
-            {
-                // Get fundamental data
-                _fundamentalData = new List<FundamentalData>();
-                foreach (var stock in _stocks)
-                {
-                    var fundamentalData = await FundamentalRepository.GetLatestFundamentalDataForStockAsync(stock.StockId);
-                    if (fundamentalData != null)
-                    {
-                        _fundamentalData.Add(fundamentalData);
-                    }
-                }
-
-                // Get scores
-                _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
-
-                // Get unique sectors
-                _sectors = _stocks.Select(s => s.Sector)
-                .Where(s => !string.IsNullOrEmpty(s))
-                .Distinct()
-                .OrderBy(s => s)
-                .Cast<string>()
-                .ToList();
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading data: {ex.Message}");
-        }
-        finally
-        {
-            _loading = false;
-            StateHasChanged();
-        }
-    }
-
-    private IEnumerable<Stock> GetFilteredStocks()
-    {
-        return string.IsNullOrEmpty(_selectedSector)
-        ? _stocks
-        : _stocks.Where(s => s.Sector == _selectedSector);
-    }
-
-    private string GetScoreBadgeClass(decimal score)
-    {
-        var baseClass = "px-2 py-1 text-xs font-medium rounded-full ";
-        return score switch
-        {
-            >= 70 => baseClass + "bg-green-100 text-green-800",
-            >= 50 => baseClass + "bg-yellow-100 text-yellow-800",
-            _ => baseClass + "bg-red-100 text-red-800"
-        };
-    }
-
-    private async Task CalculateScore(int stockId, FundamentalData fundamentals)
-    {
-        try
-        {
-            var score = ScoringService.CalculateScore(fundamentals);
-            await ScoreRepository.AddStockScoreAsync(score);
-            await LoadData();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error calculating score: {ex.Message}");
-        }
-    }
-}

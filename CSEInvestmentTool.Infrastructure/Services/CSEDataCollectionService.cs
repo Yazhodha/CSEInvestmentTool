@@ -1,6 +1,6 @@
-using System.Net.Http;
-using HtmlAgilityPack;
 using CSEInvestmentTool.Domain.Models;
+using HtmlAgilityPack;
+using Microsoft.Extensions.Logging;
 
 namespace CSEInvestmentTool.Infrastructure.Services;
 
@@ -13,11 +13,13 @@ public interface IDataCollectionService
 public class CSEDataCollectionService : IDataCollectionService
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<CSEDataCollectionService> _logger;
     private const string CSE_BASE_URL = "https://www.cse.lk";
-    
-    public CSEDataCollectionService(HttpClient httpClient)
+
+    public CSEDataCollectionService(HttpClient httpClient, ILogger<CSEDataCollectionService> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
         _httpClient.BaseAddress = new Uri(CSE_BASE_URL);
     }
 
@@ -51,11 +53,12 @@ public class CSEDataCollectionService : IDataCollectionService
                 }
             }
 
+            _logger.LogInformation("Successfully retrieved {Count} stocks from CSE", stocks.Count);
             return stocks;
         }
         catch (Exception ex)
         {
-            // Log error
+            _logger.LogError(ex, "Failed to get stocks list from CSE");
             throw new DataCollectionException("Failed to get stocks list", ex);
         }
     }
@@ -74,22 +77,56 @@ public class CSEDataCollectionService : IDataCollectionService
                 LastUpdated = DateTime.UtcNow
             };
 
-            // Extract P/E Ratio
-            var peNode = doc.DocumentNode.SelectSingleNode("//td[contains(text(),'P/E Ratio')]/following-sibling::td");
-            if (peNode != null)
+            // Market Price
+            var marketPriceNode = doc.DocumentNode.SelectSingleNode("//td[contains(text(),'Market Price')]/following-sibling::td");
+            if (marketPriceNode != null && decimal.TryParse(marketPriceNode.InnerText.Trim(), out decimal marketPrice))
             {
-                decimal.TryParse(peNode.InnerText.Trim(), out decimal peRatio);
-                fundamentalData.PERatio = peRatio;
+                fundamentalData.MarketPrice = marketPrice;
             }
 
-            // Extract other fundamental data...
-            // Note: Actual XPath selectors would need to be adjusted based on CSE website structure
+            // NAV
+            var navNode = doc.DocumentNode.SelectSingleNode("//td[contains(text(),'Net Asset Value')]/following-sibling::td");
+            if (navNode != null && decimal.TryParse(navNode.InnerText.Trim(), out decimal nav))
+            {
+                fundamentalData.NAV = nav;
+            }
 
+            // EPS
+            var epsNode = doc.DocumentNode.SelectSingleNode("//td[contains(text(),'Earnings Per Share')]/following-sibling::td");
+            if (epsNode != null && decimal.TryParse(epsNode.InnerText.Trim(), out decimal eps))
+            {
+                fundamentalData.EPS = eps;
+            }
+
+            // Annual Dividend
+            var dividendNode = doc.DocumentNode.SelectSingleNode("//td[contains(text(),'Total Dividend')]/following-sibling::td");
+            if (dividendNode != null && decimal.TryParse(dividendNode.InnerText.Trim(), out decimal dividend))
+            {
+                fundamentalData.AnnualDividend = dividend;
+            }
+
+            // Total Liabilities and Equity would typically come from financial statements
+            // For now, these might need to be entered manually or sourced from a different endpoint
+            // This is placeholder logic that would need to be updated based on actual data availability
+            var balanceSheetNodes = doc.DocumentNode.SelectNodes("//td[contains(text(),'Total Liabilities') or contains(text(),'Total Equity')]/following-sibling::td");
+            if (balanceSheetNodes?.Count >= 2)
+            {
+                if (decimal.TryParse(balanceSheetNodes[0].InnerText.Trim(), out decimal liabilities))
+                {
+                    fundamentalData.TotalLiabilities = liabilities;
+                }
+                if (decimal.TryParse(balanceSheetNodes[1].InnerText.Trim(), out decimal equity))
+                {
+                    fundamentalData.TotalEquity = equity;
+                }
+            }
+
+            _logger.LogInformation("Successfully retrieved fundamental data for stock {Symbol}", symbol);
             return fundamentalData;
         }
         catch (Exception ex)
         {
-            // Log error
+            _logger.LogError(ex, "Failed to get fundamental data for {Symbol}", symbol);
             throw new DataCollectionException($"Failed to get fundamental data for {symbol}", ex);
         }
     }
@@ -97,7 +134,7 @@ public class CSEDataCollectionService : IDataCollectionService
 
 public class DataCollectionException : Exception
 {
-    public DataCollectionException(string message, Exception innerException) 
+    public DataCollectionException(string message, Exception innerException)
         : base(message, innerException)
     {
     }

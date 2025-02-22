@@ -1,4 +1,3 @@
-using System;
 using CSEInvestmentTool.Application.Interfaces;
 using CSEInvestmentTool.Domain.Models;
 using CSEInvestmentTool.Infrastructure.Data;
@@ -15,6 +14,12 @@ public class InvestmentRecommendationRepository : IInvestmentRecommendationRepos
         _context = context;
     }
 
+    public async Task<bool> HasRecommendationForStockOnDateAsync(int stockId, DateTime date)
+    {
+        return await _context.InvestmentRecommendations
+            .AnyAsync(r => r.StockId == stockId && r.RecommendationDate.Date == date.Date);
+    }
+
     public async Task<IEnumerable<InvestmentRecommendation>> GetLatestRecommendationsAsync()
     {
         var latestDate = await _context.InvestmentRecommendations
@@ -29,7 +34,33 @@ public class InvestmentRecommendationRepository : IInvestmentRecommendationRepos
 
     public async Task AddRecommendationAsync(InvestmentRecommendation recommendation)
     {
-        await _context.InvestmentRecommendations.AddAsync(recommendation);
+        // Check if recommendation exists
+        var hasExisting = await HasRecommendationForStockOnDateAsync(
+            recommendation.StockId,
+            recommendation.RecommendationDate);
+
+        if (hasExisting)
+        {
+            // Update existing recommendation
+            var existing = await _context.InvestmentRecommendations
+                .FirstOrDefaultAsync(r =>
+                    r.StockId == recommendation.StockId &&
+                    r.RecommendationDate.Date == recommendation.RecommendationDate.Date);
+
+            if (existing != null)
+            {
+                existing.RecommendedAmount = recommendation.RecommendedAmount;
+                existing.RecommendationReason = recommendation.RecommendationReason;
+                existing.LastUpdated = DateTime.UtcNow;
+                _context.InvestmentRecommendations.Update(existing);
+            }
+        }
+        else
+        {
+            // Add new recommendation
+            await _context.InvestmentRecommendations.AddAsync(recommendation);
+        }
+
         await _context.SaveChangesAsync();
     }
 }

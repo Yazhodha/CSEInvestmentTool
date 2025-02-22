@@ -11,13 +11,13 @@ public interface IStockScoringService
 public class StockScoringService : IStockScoringService
 {
     private readonly ILogger<StockScoringService> _logger;
-    
+
     // Scoring weights
     private static readonly decimal PE_WEIGHT = 0.25m;
     private static readonly decimal ROE_WEIGHT = 0.25m;
     private static readonly decimal DIVIDEND_WEIGHT = 0.20m;
     private static readonly decimal DEBT_EQUITY_WEIGHT = 0.15m;
-    private static readonly decimal PROFIT_MARGIN_WEIGHT = 0.15m;
+    private static readonly decimal NAV_PRICE_WEIGHT = 0.15m;  // Changed from profit margin
 
     public StockScoringService(ILogger<StockScoringService> logger)
     {
@@ -42,12 +42,12 @@ public class StockScoringService : IStockScoringService
             score.ROEScore = CalculateROEScore(data.ROE);
             score.DividendYieldScore = CalculateDividendYieldScore(data.DividendYield);
             score.DebtEquityScore = CalculateDebtEquityScore(data.DebtToEquityRatio);
-            score.ProfitMarginScore = CalculateProfitMarginScore(data.NetProfitMargin);
+            score.ProfitMarginScore = CalculateNAVPriceScore(data.NAV, data.MarketPrice); // Changed to NAV/Price score
 
             // Calculate weighted total score
             score.TotalScore = CalculateWeightedScore(score);
 
-            _logger.LogInformation("Score calculated successfully for stock {StockId}. Total Score: {TotalScore}", 
+            _logger.LogInformation("Score calculated successfully for stock {StockId}. Total Score: {TotalScore}",
                 data.StockId, score.TotalScore);
 
             return score;
@@ -65,7 +65,7 @@ public class StockScoringService : IStockScoringService
                (score.ROEScore * ROE_WEIGHT) +
                (score.DividendYieldScore * DIVIDEND_WEIGHT) +
                (score.DebtEquityScore * DEBT_EQUITY_WEIGHT) +
-               (score.ProfitMarginScore * PROFIT_MARGIN_WEIGHT);
+               (score.ProfitMarginScore * NAV_PRICE_WEIGHT); // Using profit margin score field for NAV/Price
     }
 
     private decimal CalculatePEScore(decimal? peRatio)
@@ -125,7 +125,7 @@ public class StockScoringService : IStockScoringService
             _ => Math.Max(0, 100 - ((dividendYield.Value - 8) * 10))
         };
 
-        _logger.LogDebug("Dividend Yield Score calculated: {Score} for yield: {DividendYield}", 
+        _logger.LogDebug("Dividend Yield Score calculated: {Score} for yield: {DividendYield}",
             score, dividendYield);
         return score;
     }
@@ -145,30 +145,33 @@ public class StockScoringService : IStockScoringService
             _ => Math.Max(0, 80 - ((debtEquity.Value - 1) * 30))
         };
 
-        _logger.LogDebug("Debt/Equity Score calculated: {Score} for ratio: {DebtEquity}", 
+        _logger.LogDebug("Debt/Equity Score calculated: {Score} for ratio: {DebtEquity}",
             score, debtEquity);
         return score;
     }
 
-    private decimal CalculateProfitMarginScore(decimal? profitMargin)
+    private decimal CalculateNAVPriceScore(decimal nav, decimal price)
     {
-        if (!profitMargin.HasValue)
+        if (price <= 0)
         {
-            _logger.LogDebug("Invalid Profit Margin: {ProfitMargin}", profitMargin);
+            _logger.LogDebug("Invalid price: {Price}", price);
             return 0;
         }
 
-        var score = profitMargin.Value switch
+        // Calculate NAV/Price ratio (higher is better as it indicates undervaluation)
+        decimal navPriceRatio = nav / price;
+
+        var score = navPriceRatio switch
         {
-            < 0 => 0,
-            <= 5 => profitMargin.Value * 6,
-            <= 15 => 30 + ((profitMargin.Value - 5) * 4),
-            <= 25 => 70 + ((profitMargin.Value - 15) * 3),
-            _ => 100
+            < 0.5m => 30, // Significantly overvalued
+            <= 0.8m => 50, // Moderately overvalued
+            <= 1.0m => 70, // Fairly valued
+            <= 1.2m => 85, // Moderately undervalued
+            _ => 100 // Significantly undervalued
         };
 
-        _logger.LogDebug("Profit Margin Score calculated: {Score} for margin: {ProfitMargin}", 
-            score, profitMargin);
+        _logger.LogDebug("NAV/Price Score calculated: {Score} for ratio: {Ratio}",
+            score, navPriceRatio);
         return score;
     }
 }
