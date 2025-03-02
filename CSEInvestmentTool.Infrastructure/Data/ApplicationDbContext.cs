@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
 using CSEInvestmentTool.Domain.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace CSEInvestmentTool.Infrastructure.Data;
 
@@ -14,6 +14,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<FundamentalData> FundamentalData { get; set; }
     public DbSet<StockScore> StockScores { get; set; }
     public DbSet<InvestmentRecommendation> InvestmentRecommendations { get; set; }
+    public DbSet<AppSetting> AppSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,6 +35,10 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<InvestmentRecommendation>()
             .HasIndex(r => new { r.StockId, r.RecommendationDate })
+            .IsUnique();
+
+        modelBuilder.Entity<AppSetting>()
+            .HasIndex(s => s.Key)
             .IsUnique();
     }
 }

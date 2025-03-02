@@ -76,19 +76,19 @@
             </div>
         </div>
 
-        <!-- Stocks Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Stocks Grid - Maximized cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             @foreach (var stock in GetFilteredStocks())
             {
                 var fundamentals = _fundamentalData.FirstOrDefault(f => f.StockId == stock.StockId);
                 var score = _scores.FirstOrDefault(s => s.StockId == stock.StockId);
 
-                <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
-                    <div class="p-6">
-                        <div class="flex justify-between items-start mb-4">
+                <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer" @onclick="() => NavigateToDetails(stock.StockId)">
+                    <div class="p-4">
+                        <div class="flex justify-between items-start mb-3">
                             <div>
                                 <h3 class="text-lg font-bold text-gray-900">@stock.Symbol</h3>
-                                <p class="text-sm text-gray-500">@stock.CompanyName</p>
+                                <p class="text-xs text-gray-500">@stock.CompanyName</p>
                             </div>
                             @if (score != null)
                             {
@@ -98,7 +98,7 @@
                             }
                         </div>
 
-                        <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="grid grid-cols-2 gap-3 mb-3">
                             <div>
                                 <p class="text-xs text-gray-500">Market Price</p>
                                 <p class="text-sm font-semibold">
@@ -118,16 +118,16 @@
                                 </p>
                             </div>
                             <div>
-                                <p class="text-xs text-gray-500">Annual Dividend</p>
+                                <p class="text-xs text-gray-500">Dividend</p>
                                 <p class="text-sm font-semibold">
                                     @(fundamentals?.AnnualDividend.ToString("N2") ?? "N/A") LKR
                                 </p>
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-4 mb-4 pt-4 border-t">
+                        <div class="grid grid-cols-2 gap-3 mb-3 pt-2 border-t">
                             <div>
-                                <p class="text-xs text-gray-500">P/E Ratio</p>
+                                <p class="text-xs text-gray-500">P/E</p>
                                 <p class="text-sm font-semibold">
                                     @(fundamentals?.PERatio?.ToString("N2") ?? "N/A")
                                 </p>
@@ -152,21 +152,15 @@
                             </div>
                         </div>
 
-                        <div class="flex justify-between items-center pt-4 border-t">
-                            <span class="text-sm text-gray-500">@stock.Sector</span>
-                            <div class="space-x-2">
-                                @if (fundamentals != null && score == null)
-                                {
-                                    <button @onclick="() => CalculateScore(stock.StockId, fundamentals)"
-                                            class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                                        Calculate Score
-                                    </button>
-                                }
-                                <button @onclick="() => NavigateToDetails(stock.StockId)"
-                                        class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                    View Details
+                        <div class="flex justify-between items-center pt-2 border-t">
+                            <span class="text-xs text-gray-500">@stock.Sector</span>
+                            @if (fundamentals != null && score == null)
+                            {
+                                <button @onclick="() => CalculateScore(stock.StockId, fundamentals)" @onclick:stopPropagation="true"
+                                        class="text-xs px-2 py-1 border border-transparent font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none">
+                                    Calculate Score
                                 </button>
-                            </div>
+                            }
                         </div>
                     </div>
                 </div>

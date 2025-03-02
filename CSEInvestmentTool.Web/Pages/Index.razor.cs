@@ -18,8 +18,8 @@ namespace CSEInvestmentTool.Web.Pages
 
         protected override async Task OnInitializedAsync()
         {
-            // Load the monthly investment amount from configuration
-            _monthlyInvestmentAmount = Configuration.GetValue<decimal>("Investment:MonthlyAmount", 50000m);
+            // Load the monthly investment amount from database
+            _monthlyInvestmentAmount = await AllocationService.GetMonthlyInvestmentAmountAsync();
             _newMonthlyAmount = _monthlyInvestmentAmount;
 
             await LoadData();
@@ -37,7 +37,7 @@ namespace CSEInvestmentTool.Web.Pages
                 // Calculate fresh recommendations based on current scores
                 if (_scores.Any())
                 {
-                    var recommendations = AllocationService.CalculateInvestmentAllocations(
+                    var recommendations = await AllocationService.CalculateInvestmentAllocationsAsync(
                         _scores,
                         DateTime.UtcNow.Date,
                         _monthlyInvestmentAmount);
@@ -88,7 +88,7 @@ namespace CSEInvestmentTool.Web.Pages
                 // Calculate fresh recommendations based on current scores
                 if (_scores.Any())
                 {
-                    var recommendations = AllocationService.CalculateInvestmentAllocations(
+                    var recommendations = await AllocationService.CalculateInvestmentAllocationsAsync(
                         _scores,
                         DateTime.UtcNow.Date,
                         _monthlyInvestmentAmount);
@@ -152,15 +152,24 @@ namespace CSEInvestmentTool.Web.Pages
                     return;
                 }
 
-                // In a real application, you would update this in a configuration file or database
-                // For this implementation, we'll just update the in-memory value
-                _monthlyInvestmentAmount = _newMonthlyAmount;
+                // Update in database
+                var result = await AllocationService.UpdateMonthlyInvestmentAmountAsync(_newMonthlyAmount);
 
-                // Close the modal
-                _showBudgetModal = false;
+                if (result)
+                {
+                    // Update local value too
+                    _monthlyInvestmentAmount = _newMonthlyAmount;
 
-                // Regenerate recommendations with the new budget
-                await GenerateRecommendations();
+                    // Close the modal
+                    _showBudgetModal = false;
+
+                    // Regenerate recommendations with the new budget
+                    await GenerateRecommendations();
+                }
+                else
+                {
+                    _budgetErrorMessage = "Failed to update the budget. Please try again.";
+                }
             }
             catch (Exception ex)
             {

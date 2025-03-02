@@ -1,3 +1,4 @@
+using CSEInvestmentTool.Application.Interfaces;
 using CSEInvestmentTool.Domain.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -6,7 +7,9 @@ namespace CSEInvestmentTool.Application.Services;
 
 public interface IInvestmentAllocationService
 {
-    List<InvestmentRecommendation> CalculateInvestmentAllocations(
+    Task<decimal> GetMonthlyInvestmentAmountAsync();
+    Task<bool> UpdateMonthlyInvestmentAmountAsync(decimal amount);
+    Task<List<InvestmentRecommendation>> CalculateInvestmentAllocationsAsync(
         List<StockScore> rankedStocks,
         DateTime recommendationDate,
         decimal? monthlyInvestmentAmount = null);
@@ -16,6 +19,7 @@ public class InvestmentAllocationService : IInvestmentAllocationService
 {
     private readonly ILogger<InvestmentAllocationService> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IAppSettingsRepository _settingsRepository;
 
     // Configuration constants with default values
     private readonly decimal _defaultMonthlyInvestmentAmount;
@@ -25,31 +29,66 @@ public class InvestmentAllocationService : IInvestmentAllocationService
 
     public InvestmentAllocationService(
         ILogger<InvestmentAllocationService> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IAppSettingsRepository settingsRepository)
     {
         _logger = logger;
         _configuration = configuration;
+        _settingsRepository = settingsRepository;
 
-        // Load configuration with defaults
+        // Load configuration with defaults for other values
         _defaultMonthlyInvestmentAmount = _configuration.GetValue<decimal>("Investment:MonthlyAmount", 50000m);
         _maxStocks = _configuration.GetValue<int>("Investment:MaxStocks", 5);
         _minimumAllocation = _configuration.GetValue<decimal>("Investment:MinimumAllocation", 5000m);
         _highScoreThreshold = _configuration.GetValue<decimal>("Investment:HighScoreThreshold", 80m);
 
-        _logger.LogInformation("Investment Allocation Service initialized with: Monthly Amount: {MonthlyAmount}, " +
+        _logger.LogInformation("Investment Allocation Service initialized with default values: " +
+                             "Default Monthly Amount: {MonthlyAmount}, " +
                              "Max Stocks: {MaxStocks}, Minimum Allocation: {MinAllocation}",
             _defaultMonthlyInvestmentAmount, _maxStocks, _minimumAllocation);
     }
 
-    public List<InvestmentRecommendation> CalculateInvestmentAllocations(
+    public async Task<decimal> GetMonthlyInvestmentAmountAsync()
+    {
+        // Try to get the value from the database
+        var amount = await _settingsRepository.GetSettingValueAsync<decimal>("MonthlyInvestmentAmount", _defaultMonthlyInvestmentAmount);
+        return amount;
+    }
+
+    public async Task<bool> UpdateMonthlyInvestmentAmountAsync(decimal amount)
+    {
+        if (amount <= 0)
+        {
+            _logger.LogWarning("Attempted to set invalid monthly investment amount: {Amount}", amount);
+            return false;
+        }
+
+        var result = await _settingsRepository.UpdateSettingAsync(
+            "MonthlyInvestmentAmount",
+            amount.ToString(),
+            "Monthly investment budget in LKR");
+
+        if (result)
+        {
+            _logger.LogInformation("Monthly investment amount updated to {Amount}", amount);
+        }
+        else
+        {
+            _logger.LogError("Failed to update monthly investment amount to {Amount}", amount);
+        }
+
+        return result;
+    }
+
+    public async Task<List<InvestmentRecommendation>> CalculateInvestmentAllocationsAsync(
         List<StockScore> rankedStocks,
         DateTime recommendationDate,
         decimal? monthlyInvestmentAmount = null)
     {
         try
         {
-            // Use the provided amount or fall back to configuration
-            decimal investmentAmount = monthlyInvestmentAmount ?? _defaultMonthlyInvestmentAmount;
+            // Use the provided amount or get from database
+            decimal investmentAmount = monthlyInvestmentAmount ?? await GetMonthlyInvestmentAmountAsync();
 
             _logger.LogInformation("Calculating investment allocations for {Count} stocks on {Date} with budget {Amount:C}",
                 rankedStocks.Count, recommendationDate, investmentAmount);
