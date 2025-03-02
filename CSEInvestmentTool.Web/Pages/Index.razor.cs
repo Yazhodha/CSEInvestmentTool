@@ -1,15 +1,27 @@
 using CSEInvestmentTool.Domain.Models;
+using Microsoft.AspNetCore.Components;
 
 namespace CSEInvestmentTool.Web.Pages
 {
     public partial class Index
     {
+        [Inject]
+        private IConfiguration Configuration { get; set; } = default!;
+
         private bool _loading = true;
         private List<StockScore> _scores = new();
         private List<InvestmentRecommendation> _recommendations = new();
+        private decimal _monthlyInvestmentAmount = 50000m;
+        private decimal _newMonthlyAmount = 50000m;
+        private bool _showBudgetModal = false;
+        private string? _budgetErrorMessage;
 
         protected override async Task OnInitializedAsync()
         {
+            // Load the monthly investment amount from configuration
+            _monthlyInvestmentAmount = Configuration.GetValue<decimal>("Investment:MonthlyAmount", 50000m);
+            _newMonthlyAmount = _monthlyInvestmentAmount;
+
             await LoadData();
         }
 
@@ -84,6 +96,45 @@ namespace CSEInvestmentTool.Web.Pages
         private void NavigateToStockDetails(int stockId)
         {
             Navigation.NavigateTo($"/stocks/{stockId}");
+        }
+
+        private void OpenBudgetModal()
+        {
+            _newMonthlyAmount = _monthlyInvestmentAmount;
+            _budgetErrorMessage = null;
+            _showBudgetModal = true;
+        }
+
+        private void CloseBudgetModal()
+        {
+            _showBudgetModal = false;
+        }
+
+        private async Task UpdateBudget()
+        {
+            try
+            {
+                if (_newMonthlyAmount <= 0)
+                {
+                    _budgetErrorMessage = "Monthly budget must be greater than zero.";
+                    return;
+                }
+
+                // In a real application, you would update this in a configuration file or database
+                // For this implementation, we'll just update the in-memory value
+                _monthlyInvestmentAmount = _newMonthlyAmount;
+
+                // Close the modal
+                _showBudgetModal = false;
+
+                // Regenerate recommendations with the new budget
+                await GenerateRecommendations();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error updating monthly investment budget");
+                _budgetErrorMessage = "An error occurred while updating the budget.";
+            }
         }
     }
 }
