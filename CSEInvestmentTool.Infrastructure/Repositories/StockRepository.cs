@@ -66,8 +66,25 @@ public class StockRepository : IStockRepository
 
     public async Task UpdateStockAsync(Stock stock)
     {
-        _context.Stocks.Update(stock);
-        await _context.SaveChangesAsync();
+        try
+        {
+            // Handle entity tracking
+            var localEntry = _context.Stocks
+                .Local
+                .FirstOrDefault(s => s.StockId == stock.StockId);
+
+            if (localEntry != null)
+            {
+                _context.Entry(localEntry).State = EntityState.Detached;
+            }
+
+            _context.Entry(stock).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Error updating stock {stock.Symbol}: {ex.Message}", ex);
+        }
     }
 
     public async Task DeleteStockAsync(int id)

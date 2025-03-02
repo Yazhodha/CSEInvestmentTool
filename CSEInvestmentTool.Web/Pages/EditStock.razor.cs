@@ -1,5 +1,6 @@
 using CSEInvestmentTool.Domain.Models;
 using Microsoft.AspNetCore.Components;
+using Microsoft.EntityFrameworkCore;
 
 namespace CSEInvestmentTool.Web.Pages
 {
@@ -50,23 +51,16 @@ namespace CSEInvestmentTool.Web.Pages
                     // Load fundamental data
                     _fundamentalData = await FundamentalRepository.GetLatestFundamentalDataForStockAsync(Id);
 
-                    // Copy data to edit model
-                    _stockEntry.Stock = new Stock
-                    {
-                        StockId = _stock.StockId,
-                        Symbol = _stock.Symbol,
-                        CompanyName = _stock.CompanyName,
-                        Sector = _stock.Sector,
-                        IsActive = _stock.IsActive,
-                        LastUpdated = _stock.LastUpdated
-                    };
+                    // Reference the stock for display purposes only
+                    _stockEntry.Stock = _stock;
 
                     if (_fundamentalData != null)
                     {
+                        // Initialize with existing values but as a new object
                         _stockEntry.Fundamentals = new FundamentalData
                         {
-                            FundamentalId = _fundamentalData.FundamentalId,
-                            StockId = _fundamentalData.StockId,
+                            // Don't set FundamentalId for a new record
+                            StockId = _stock.StockId,
                             Date = DateTime.UtcNow.Date, // Use current date for new entry
                             MarketPrice = _fundamentalData.MarketPrice,
                             NAV = _fundamentalData.NAV,
@@ -112,41 +106,49 @@ namespace CSEInvestmentTool.Web.Pages
                     return;
                 }
 
-                // Update the stock properties
-                _stock.Symbol = _stockEntry.Stock.Symbol;
-                _stock.CompanyName = _stockEntry.Stock.CompanyName;
-                _stock.Sector = _stockEntry.Stock.Sector;
+                // We're not updating stock properties anymore, only fundamental data
+                // Only update the LastUpdated timestamp
                 _stock.LastUpdated = DateTime.UtcNow;
-
-                // Update the stock
                 await StockRepository.UpdateStockAsync(_stock);
 
-                // Set the StockId for fundamental data (in case it's a new entry)
-                _stockEntry.Fundamentals.StockId = _stock.StockId;
+                // Create a completely new fundamental data entry with today's date
+                var newFundamentalData = new FundamentalData
+                {
+                    StockId = _stock.StockId,
+                    Date = DateTime.UtcNow.Date,
+                    MarketPrice = _stockEntry.Fundamentals.MarketPrice,
+                    NAV = _stockEntry.Fundamentals.NAV,
+                    EPS = _stockEntry.Fundamentals.EPS,
+                    AnnualDividend = _stockEntry.Fundamentals.AnnualDividend,
+                    TotalLiabilities = _stockEntry.Fundamentals.TotalLiabilities,
+                    TotalEquity = _stockEntry.Fundamentals.TotalEquity,
+                    LastUpdated = DateTime.UtcNow
+                };
 
-                // Make sure date is set correctly
-                _stockEntry.Fundamentals.Date = DateTime.UtcNow.Date;
-                _stockEntry.Fundamentals.LastUpdated = DateTime.UtcNow;
+                // Add as a new fundamental data record
+                await FundamentalRepository.AddFundamentalDataAsync(newFundamentalData);
 
-                // Add/Update the fundamental data
-                await FundamentalRepository.AddFundamentalDataAsync(_stockEntry.Fundamentals);
-
-                // Calculate and save the score
-                var score = ScoringService.CalculateScore(_stockEntry.Fundamentals);
+                // Calculate and save the score using the new fundamental data
+                var score = ScoringService.CalculateScore(newFundamentalData);
                 await ScoreRepository.AddStockScoreAsync(score);
 
-                Logger.LogInformation("Successfully updated stock: {Symbol}", _stock.Symbol);
+                Logger.LogInformation("Successfully updated fundamental data for stock: {Symbol}", _stock.Symbol);
 
                 // Navigate back to stock details
                 NavigationManager.NavigateTo($"/stocks/{_stock.StockId}");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error updating stock: {Symbol}", _stockEntry.Stock.Symbol);
+                Logger.LogError(ex, "Error updating stock: {Symbol}", _stock.Symbol);
 
                 if (ex is InvalidOperationException)
                 {
                     _errorMessage = ex.Message;
+                }
+                else if (ex is DbUpdateException dbUpdateEx)
+                {
+                    _errorMessage = "Database error: Unable to update stock data. Please try again.";
+                    Logger.LogError(dbUpdateEx, "Database error updating stock: {Symbol}", _stock.Symbol);
                 }
                 else
                 {

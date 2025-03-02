@@ -30,7 +30,7 @@
             <div class="space-x-4">
                 <button @onclick="NavigateToEdit"
                         class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700">
-                    Edit Stock
+                    Update Fundamental Data
                 </button>
                 <button @onclick="NavigateBack"
                         class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
@@ -43,7 +43,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
             <!-- Basic Stock Information -->
             <div class="bg-white shadow overflow-hidden rounded-lg">
                 <div class="px-4 py-5 sm:px-6 bg-gray-50">
@@ -203,7 +203,7 @@
             }
             else
             {
-                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 lg:col-span-2">
                     <p class="text-sm text-yellow-700">No fundamental data available for this stock.</p>
                 </div>
             }

@@ -41,29 +41,57 @@ public class FundamentalDataRepository : IFundamentalDataRepository
 
     public async Task AddFundamentalDataAsync(FundamentalData data)
     {
-        // Check if fundamental data exists for this stock and date
-        var existingData = await _context.FundamentalData
-            .FirstOrDefaultAsync(f => f.StockId == data.StockId && f.Date.Date == data.Date.Date);
-
-        if (existingData != null)
+        try
         {
-            // Update existing fundamental data
-            existingData.MarketPrice = data.MarketPrice;
-            existingData.NAV = data.NAV;
-            existingData.EPS = data.EPS;
-            existingData.AnnualDividend = data.AnnualDividend;
-            existingData.TotalLiabilities = data.TotalLiabilities;
-            existingData.TotalEquity = data.TotalEquity;
-            existingData.LastUpdated = DateTime.UtcNow;
+            // If an ID is specified (existing entity), make sure we handle tracking properly
+            if (data.FundamentalId > 0)
+            {
+                // If this is an existing entity, make sure it's not tracked
+                var localEntry = _context.FundamentalData
+                    .Local
+                    .FirstOrDefault(f => f.FundamentalId == data.FundamentalId);
 
-            _context.FundamentalData.Update(existingData);
+                if (localEntry != null)
+                {
+                    _context.Entry(localEntry).State = EntityState.Detached;
+                }
+
+                // Use Update instead of Add
+                _context.Entry(data).State = EntityState.Modified;
+            }
+            else
+            {
+                // Check if fundamental data exists for this stock and date
+                var existingData = await _context.FundamentalData
+                    .FirstOrDefaultAsync(f => f.StockId == data.StockId && f.Date.Date == data.Date.Date);
+
+                if (existingData != null)
+                {
+                    // Update existing fundamental data
+                    existingData.MarketPrice = data.MarketPrice;
+                    existingData.NAV = data.NAV;
+                    existingData.EPS = data.EPS;
+                    existingData.AnnualDividend = data.AnnualDividend;
+                    existingData.TotalLiabilities = data.TotalLiabilities;
+                    existingData.TotalEquity = data.TotalEquity;
+                    existingData.LastUpdated = DateTime.UtcNow;
+
+                    _context.FundamentalData.Update(existingData);
+                }
+                else
+                {
+                    // Add new fundamental data - make sure FundamentalId is 0
+                    // so EF will assign a new ID
+                    data.FundamentalId = 0;
+                    await _context.FundamentalData.AddAsync(data);
+                }
+            }
+
+            await _context.SaveChangesAsync();
         }
-        else
+        catch (Exception ex)
         {
-            // Add new fundamental data
-            await _context.FundamentalData.AddAsync(data);
+            throw new InvalidOperationException($"Error adding fundamental data for stock {data.StockId}: {ex.Message}", ex);
         }
-
-        await _context.SaveChangesAsync();
     }
 }
