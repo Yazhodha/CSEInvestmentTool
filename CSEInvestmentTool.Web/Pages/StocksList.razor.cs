@@ -81,6 +81,51 @@ namespace CSEInvestmentTool.Web.Pages
             };
         }
 
+        private async Task CalculateScore(int stockId, FundamentalData fundamentals)
+        {
+            try
+            {
+                var score = ScoringService.CalculateScore(fundamentals);
+                await ScoreRepository.AddStockScoreAsync(score);
+
+                // Refresh scores
+                _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
+
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calculating score: {ex.Message}");
+            }
+        }
+
+        private async Task RecalculateAllScores()
+        {
+            try
+            {
+                _loading = true;
+                StateHasChanged();
+
+                foreach (var fundamentalData in _fundamentalData)
+                {
+                    var score = ScoringService.CalculateScore(fundamentalData);
+                    await ScoreRepository.AddStockScoreAsync(score);
+                }
+
+                // Refresh scores
+                _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
+
+                _loading = false;
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error recalculating scores: {ex.Message}");
+                _loading = false;
+                StateHasChanged();
+            }
+        }
+
         private void AddNewStock()
         {
             Navigation.NavigateTo("/stocks/add");

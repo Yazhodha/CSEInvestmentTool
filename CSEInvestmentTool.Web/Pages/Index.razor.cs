@@ -39,7 +39,8 @@ namespace CSEInvestmentTool.Web.Pages
                 {
                     var recommendations = AllocationService.CalculateInvestmentAllocations(
                         _scores,
-                        DateTime.UtcNow.Date);
+                        DateTime.UtcNow.Date,
+                        _monthlyInvestmentAmount);
 
                     // Save each recommendation
                     foreach (var recommendation in recommendations)
@@ -81,7 +82,38 @@ namespace CSEInvestmentTool.Web.Pages
             {
                 _loading = true;
 
-                await LoadData();
+                // Get latest scores
+                _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
+
+                // Calculate fresh recommendations based on current scores
+                if (_scores.Any())
+                {
+                    var recommendations = AllocationService.CalculateInvestmentAllocations(
+                        _scores,
+                        DateTime.UtcNow.Date,
+                        _monthlyInvestmentAmount);
+
+                    // Save each recommendation
+                    foreach (var recommendation in recommendations)
+                    {
+                        try
+                        {
+                            await RecommendationRepository.AddRecommendationAsync(recommendation);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogWarning(ex, "Error saving recommendation for stock {StockId}", recommendation.StockId);
+                            // Continue with other recommendations even if one fails
+                        }
+                    }
+
+                    // Get the latest recommendations after saving
+                    _recommendations = (await RecommendationRepository.GetLatestRecommendationsAsync()).ToList();
+                }
+                else
+                {
+                    _recommendations = new List<InvestmentRecommendation>();
+                }
             }
             catch (Exception ex)
             {

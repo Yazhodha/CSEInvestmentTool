@@ -8,7 +8,8 @@ public interface IInvestmentAllocationService
 {
     List<InvestmentRecommendation> CalculateInvestmentAllocations(
         List<StockScore> rankedStocks,
-        DateTime recommendationDate);
+        DateTime recommendationDate,
+        decimal? monthlyInvestmentAmount = null);
 }
 
 public class InvestmentAllocationService : IInvestmentAllocationService
@@ -17,7 +18,7 @@ public class InvestmentAllocationService : IInvestmentAllocationService
     private readonly IConfiguration _configuration;
 
     // Configuration constants with default values
-    private readonly decimal _monthlyInvestmentAmount;
+    private readonly decimal _defaultMonthlyInvestmentAmount;
     private readonly int _maxStocks;
     private readonly decimal _minimumAllocation;
     private readonly decimal _highScoreThreshold;
@@ -30,24 +31,28 @@ public class InvestmentAllocationService : IInvestmentAllocationService
         _configuration = configuration;
 
         // Load configuration with defaults
-        _monthlyInvestmentAmount = _configuration.GetValue<decimal>("Investment:MonthlyAmount", 50000m);
+        _defaultMonthlyInvestmentAmount = _configuration.GetValue<decimal>("Investment:MonthlyAmount", 50000m);
         _maxStocks = _configuration.GetValue<int>("Investment:MaxStocks", 5);
         _minimumAllocation = _configuration.GetValue<decimal>("Investment:MinimumAllocation", 5000m);
         _highScoreThreshold = _configuration.GetValue<decimal>("Investment:HighScoreThreshold", 80m);
 
         _logger.LogInformation("Investment Allocation Service initialized with: Monthly Amount: {MonthlyAmount}, " +
                              "Max Stocks: {MaxStocks}, Minimum Allocation: {MinAllocation}",
-            _monthlyInvestmentAmount, _maxStocks, _minimumAllocation);
+            _defaultMonthlyInvestmentAmount, _maxStocks, _minimumAllocation);
     }
 
     public List<InvestmentRecommendation> CalculateInvestmentAllocations(
         List<StockScore> rankedStocks,
-        DateTime recommendationDate)
+        DateTime recommendationDate,
+        decimal? monthlyInvestmentAmount = null)
     {
         try
         {
-            _logger.LogInformation("Calculating investment allocations for {Count} stocks on {Date}",
-            rankedStocks.Count, recommendationDate);
+            // Use the provided amount or fall back to configuration
+            decimal investmentAmount = monthlyInvestmentAmount ?? _defaultMonthlyInvestmentAmount;
+
+            _logger.LogInformation("Calculating investment allocations for {Count} stocks on {Date} with budget {Amount:C}",
+                rankedStocks.Count, recommendationDate, investmentAmount);
 
             var recommendations = new List<InvestmentRecommendation>();
 
@@ -70,11 +75,11 @@ public class InvestmentAllocationService : IInvestmentAllocationService
 
             // Calculate allocation based on scores
             decimal totalScore = topStocks.Sum(s => s.TotalScore);
-            decimal remainingAmount = _monthlyInvestmentAmount;
+            decimal remainingAmount = investmentAmount;
 
             foreach (var stock in topStocks)
             {
-                var recommendation = CalculateStockAllocation(stock, totalScore, ref remainingAmount, recommendationDate);
+                var recommendation = CalculateStockAllocation(stock, totalScore, investmentAmount, ref remainingAmount, recommendationDate);
                 recommendations.Add(recommendation);
 
                 _logger.LogDebug("Allocated {Amount:C} to stock {StockId}. Remaining amount: {Remaining:C}",
@@ -101,13 +106,14 @@ public class InvestmentAllocationService : IInvestmentAllocationService
     private InvestmentRecommendation CalculateStockAllocation(
         StockScore stock,
         decimal totalScore,
+        decimal investmentAmount,
         ref decimal remainingAmount,
         DateTime recommendationDate)
     {
         // Calculate proportional allocation
         decimal proportion = stock.TotalScore / totalScore;
         decimal recommendedAmount = Math.Round(
-            _monthlyInvestmentAmount * proportion,
+            investmentAmount * proportion,
             0,
             MidpointRounding.AwayFromZero);
 
@@ -150,7 +156,7 @@ public class InvestmentAllocationService : IInvestmentAllocationService
         if (score.DebtEquityScore >= _highScoreThreshold)
             reasons.Add("Healthy debt levels");
         if (score.ProfitMarginScore >= _highScoreThreshold)
-            reasons.Add("Good profit margins");
+            reasons.Add("Good NAV to price ratio");
 
         if (!reasons.Any())
             reasons.Add("Overall balanced performance");

@@ -24,6 +24,11 @@
                 <span class="mr-2">+</span>
                 Add Stock
             </button>
+            <button @onclick="RecalculateAllScores"
+                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                <span class="mr-2">★</span>
+                Recalculate Scores
+            </button>
             <button @onclick="LoadData"
                     class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                 <span class="mr-2">↻</span>
@@ -150,6 +155,13 @@
                         <div class="flex justify-between items-center pt-4 border-t">
                             <span class="text-sm text-gray-500">@stock.Sector</span>
                             <div class="space-x-2">
+                                @if (fundamentals != null && score == null)
+                                {
+                                    <button @onclick="() => CalculateScore(stock.StockId, fundamentals)"
+                                            class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                        Calculate Score
+                                    </button>
+                                }
                                 <button @onclick="() => NavigateToDetails(stock.StockId)"
                                         class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                     View Details
@@ -162,4 +174,3 @@
         </div>
     }
 </div>
-
