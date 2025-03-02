@@ -80,5 +80,10 @@ namespace CSEInvestmentTool.Web.Pages
                 _loading = false;
             }
         }
+
+        private void NavigateToStockDetails(int stockId)
+        {
+            Navigation.NavigateTo($"/stocks/{stockId}");
+        }
     }
 }

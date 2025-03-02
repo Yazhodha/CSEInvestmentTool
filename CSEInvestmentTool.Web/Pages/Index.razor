@@ -7,6 +7,7 @@
 @inject IStockScoreRepository ScoreRepository
 @inject IInvestmentAllocationService AllocationService
 @inject IInvestmentRecommendationRepository RecommendationRepository
+@inject NavigationManager Navigation
 
 <div class="space-y-6">
     <button @onclick="GenerateRecommendations"
@@ -86,7 +87,7 @@
                         <tbody class="bg-white divide-y divide-gray-200">
                             @foreach (var recommendation in _recommendations)
                             {
-                                <tr class="hover:bg-gray-50">
+                                <tr class="hover:bg-gray-50 cursor-pointer" @onclick="() => NavigateToStockDetails(recommendation.StockId)">
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center">
                                             <div>
@@ -125,7 +126,7 @@
                     <div class="ml-3">
                         <p class="text-sm text-yellow-700">
                             No recommendations available.
-                            <button @onclick="GenerateRecommendations" 
+                            <button @onclick="GenerateRecommendations"
                                     class="text-blue-600 hover:text-blue-800 underline focus:outline-none">
                                 Generate Recommendations
                             </button>
@@ -136,4 +137,3 @@
         }
     }
 </div>
-
