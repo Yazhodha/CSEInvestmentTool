@@ -33,6 +33,7 @@ builder.Services.AddScoped<IStockRepository, StockRepository>();
 builder.Services.AddScoped<IFundamentalDataRepository, FundamentalDataRepository>();
 builder.Services.AddScoped<IStockScoreRepository, StockScoreRepository>();
 builder.Services.AddScoped<IInvestmentRecommendationRepository, InvestmentRecommendationRepository>();
+builder.Services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
 
 // Register TestDataSeeder
 builder.Services.AddScoped<TestDataSeeder>();

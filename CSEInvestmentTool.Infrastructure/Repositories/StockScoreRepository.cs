@@ -36,30 +36,53 @@ public class StockScoreRepository : IStockScoreRepository
 
     public async Task AddStockScoreAsync(StockScore score)
     {
-        // Check if a score exists for this stock and date
-        var existingScore = await _context.StockScores
-            .FirstOrDefaultAsync(s => s.StockId == score.StockId && s.ScoreDate.Date == score.ScoreDate.Date);
-
-        if (existingScore != null)
+        try
         {
-            // Update existing score
-            existingScore.PEScore = score.PEScore;
-            existingScore.ROEScore = score.ROEScore;
-            existingScore.DividendYieldScore = score.DividendYieldScore;
-            existingScore.DebtEquityScore = score.DebtEquityScore;
-            existingScore.ProfitMarginScore = score.ProfitMarginScore;
-            existingScore.TotalScore = score.TotalScore;
-            existingScore.Rank = score.Rank;
-            existingScore.LastUpdated = DateTime.UtcNow;
+            // Always use score date as the current date to avoid conflicts
+            score.ScoreDate = DateTime.UtcNow.Date;
 
-            _context.StockScores.Update(existingScore);
+            // Check if a score exists for this stock and date
+            var existingScore = await _context.StockScores
+                .FirstOrDefaultAsync(s => s.StockId == score.StockId && s.ScoreDate.Date == score.ScoreDate.Date);
+
+            if (existingScore != null)
+            {
+                // Handle entity tracking
+                var localEntry = _context.StockScores
+                    .Local
+                    .FirstOrDefault(s => s.ScoreId == existingScore.ScoreId);
+
+                if (localEntry != null)
+                {
+                    _context.Entry(localEntry).State = EntityState.Detached;
+                }
+
+                // Update existing score
+                existingScore.PEScore = score.PEScore;
+                existingScore.ROEScore = score.ROEScore;
+                existingScore.DividendYieldScore = score.DividendYieldScore;
+                existingScore.DebtEquityScore = score.DebtEquityScore;
+                existingScore.ProfitMarginScore = score.ProfitMarginScore;
+                existingScore.TotalScore = score.TotalScore;
+                existingScore.Rank = score.Rank;
+                existingScore.LastUpdated = DateTime.UtcNow;
+
+                _context.Entry(existingScore).State = EntityState.Modified;
+            }
+            else
+            {
+                // Make sure we don't have an ID set for a new score
+                score.ScoreId = 0;
+
+                // Add new score
+                await _context.StockScores.AddAsync(score);
+            }
+
+            await _context.SaveChangesAsync();
         }
-        else
+        catch (Exception ex)
         {
-            // Add new score
-            await _context.StockScores.AddAsync(score);
+            throw new InvalidOperationException($"Error adding stock score for stock {score.StockId}: {ex.Message}", ex);
         }
-
-        await _context.SaveChangesAsync();
     }
 }
