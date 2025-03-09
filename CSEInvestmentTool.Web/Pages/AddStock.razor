@@ -12,7 +12,7 @@
 @inject NavigationManager NavigationManager
 @inject ILogger<AddStock> Logger
 
-<div class="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-sm">
+<div class="max-w-7xl mx-auto p-6 bg-white rounded-lg shadow-sm">
     <h2 class="text-2xl font-bold mb-6">Add New Stock</h2>
 
     @if (!string.IsNullOrEmpty(_errorMessage))
@@ -35,9 +35,9 @@
     <EditForm Model="@_stockEntry" OnValidSubmit="HandleValidSubmit">
         <DataAnnotationsValidator />
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-12 gap-6">
             <!-- Stock Information -->
-            <div class="space-y-6 p-6 bg-gray-50 rounded-lg">
+            <div class="@(_relatedSymbols.Count > 0 ? "col-span-3" : "col-span-6") space-y-6 p-6 bg-gray-50 rounded-lg">
                 <h3 class="text-lg font-semibold">Stock Information</h3>
 
                 <!-- Company Search Dropdown -->
@@ -51,7 +51,7 @@
                                    @onblur="DelayedHideCompanyDropdown"
                                    @oninput="HandleCompanySearchInput"
                                    value="@_companySearchInput"
-                                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-10" />
                             @if (_loadingCompanies)
                             {
                                 <div class="absolute inset-y-0 right-3 flex items-center">
@@ -79,10 +79,10 @@
                         }
                     </div>
 
-                    @if (!string.IsNullOrEmpty(_selectedCompanyName))
+                    @if (string.IsNullOrEmpty(_stockEntry.Stock.CompanyName) && _validationAttempted)
                     {
-                        <div class="mt-1 text-xs text-green-600">
-                            Selected: @_selectedCompanyName
+                        <div class="bg-red-50 border-l-4 border-red-400 p-2 mt-1 rounded">
+                            <p class="text-xs text-red-700">Company name is required</p>
                         </div>
                     }
                 </div>
@@ -97,16 +97,26 @@
                                     _selectedStockType = e.Value?.ToString() ?? string.Empty;
                                     await HandleStockTypeChange(e);
                                 }"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-10">
                             <option value="">Select a stock type</option>
                             @foreach (var stockType in _availableStockTypes)
                             {
                                 <option value="@stockType.Symbol">@stockType.Symbol</option>
                             }
                         </select>
-                        <div class="mt-1 text-xs text-indigo-600">
-                            This company has multiple stock types. Please select one.
-                        </div>
+                        @if (string.IsNullOrEmpty(_stockEntry.Stock.Symbol) && _availableStockTypes.Count > 1)
+                        {
+                            <div class="mt-1 text-xs text-blue-600">
+                                This company has multiple stock types. Please select one.
+                            </div>
+                        }
+
+                        @if (_availableStockTypes.Count > 1 && string.IsNullOrEmpty(_selectedStockType) && _validationAttempted)
+                        {
+                            <div class="bg-red-50 border-l-4 border-red-400 p-2 mt-1 rounded">
+                                <p class="text-xs text-red-700">Stock type is required</p>
+                            </div>
+                        }
                     </div>
                 }
 
@@ -126,164 +136,189 @@
                             </div>
                         }
                     </div>
-                    <ValidationMessage For="@(() => _stockEntry.Stock.Symbol)" class="text-red-500 text-sm" />
+
+                    @if (string.IsNullOrEmpty(_stockEntry.Stock.Symbol) && _validationAttempted)
+                    {
+                        <div class="bg-red-50 border-l-4 border-red-400 p-2 mt-1 rounded">
+                            <p class="text-xs text-red-700">Symbol is required</p>
+                        </div>
+                    }
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Sector</label>
                     <InputSelect @bind-Value="_stockEntry.Stock.Sector"
-                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-10">
                         <option value="">Select a Sector</option>
                         @foreach (var sector in _sectors)
                         {
                             <option value="@sector">@sector</option>
                         }
                     </InputSelect>
-                    <ValidationMessage For="@(() => _stockEntry.Stock.Sector)" class="text-red-500 text-sm" />
+
+                    @if (string.IsNullOrEmpty(_stockEntry.Stock.Sector) && _validationAttempted)
+                    {
+                        <div class="bg-red-50 border-l-4 border-red-400 p-2 mt-1 rounded">
+                            <p class="text-xs text-red-700">Sector is required</p>
+                        </div>
+                    }
                 </div>
             </div>
 
             <!-- Fundamental Data -->
-            <div class="space-y-6 p-6 bg-gray-50 rounded-lg">
+            <div class="@(_relatedSymbols.Count > 0 ? "col-span-3" : "col-span-6") space-y-6 p-6 bg-gray-50 rounded-lg">
                 <h3 class="text-lg font-semibold">Fundamental Data</h3>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Market Price (LKR)</label>
                     <div class="relative mt-1">
-                        <div class="flex">
-                            <InputNumber @bind-Value="_stockEntry.Fundamentals.MarketPrice"
-                                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-100"
-                                         disabled="true" />
-                            <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                <span class="text-gray-500 sm:text-sm">Auto-fetched</span>
-                            </div>
-                        </div>
-                        <!-- Display formatted market price -->
-                        <div class="mt-1 text-xs text-gray-600">
-                            Formatted: @_stockEntry.Fundamentals.MarketPrice.ToTwoDecimalPlaces() LKR
-                        </div>
+                        <InputNumber @bind-Value="_stockEntry.Fundamentals.MarketPrice"
+                                     class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-100 h-10"
+                                     disabled="true" />
                     </div>
-                    <ValidationMessage For="@(() => _stockEntry.Fundamentals.MarketPrice)" class="text-red-500 text-sm" />
+                    <div class="mt-1 text-xs text-gray-600">
+                        @_stockEntry.Fundamentals.MarketPrice.ToTwoDecimalPlaces() LKR
+                    </div>
+
+                    @if (_stockEntry.Fundamentals.MarketPrice <= 0 && _validationAttempted)
+                    {
+                        <div class="bg-red-50 border-l-4 border-red-400 p-2 mt-1 rounded">
+                            <p class="text-xs text-red-700">Market Price must be greater than zero</p>
+                        </div>
+                    }
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">NAV (LKR)</label>
                     <div class="relative mt-1">
-                        <div class="flex">
-                            <InputNumber @bind-Value="_stockEntry.Fundamentals.NAV"
-                                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-100"
-                                         disabled="true" />
-                            <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                <span class="text-gray-500 sm:text-sm">Auto-calculated</span>
-                            </div>
-                        </div>
-                        <!-- Display formatted NAV -->
-                        <div class="mt-1 text-xs text-gray-600">
-                            Formatted: @_stockEntry.Fundamentals.NAV.ToTwoDecimalPlaces() LKR
-                        </div>
+                        <InputNumber @bind-Value="_stockEntry.Fundamentals.NAV"
+                                     class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-100 h-10"
+                                     disabled="true" />
                     </div>
-                    <ValidationMessage For="@(() => _stockEntry.Fundamentals.NAV)" class="text-red-500 text-sm" />
+                    <div class="mt-1 text-xs text-gray-600">
+                        @_stockEntry.Fundamentals.NAV.ToTwoDecimalPlaces() LKR
+                    </div>
+
+                    @if (_stockEntry.Fundamentals.NAV <= 0 && _validationAttempted)
+                    {
+                        <div class="bg-red-50 border-l-4 border-red-400 p-2 mt-1 rounded">
+                            <p class="text-xs text-red-700">NAV must be greater than zero</p>
+                        </div>
+                    }
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">EPS (LKR)</label>
                     <InputNumber @bind-Value="_stockEntry.Fundamentals.EPS"
-                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                    <ValidationMessage For="@(() => _stockEntry.Fundamentals.EPS)" class="text-red-500 text-sm" />
+                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-10" />
+
+                    @if (_stockEntry.Fundamentals.EPS <= 0 && _validationAttempted)
+                    {
+                        <div class="bg-red-50 border-l-4 border-red-400 p-2 mt-1 rounded">
+                            <p class="text-xs text-red-700">EPS must be greater than zero</p>
+                        </div>
+                    }
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Annual Dividend (LKR)</label>
                     <InputNumber @bind-Value="_stockEntry.Fundamentals.AnnualDividend"
-                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                    <ValidationMessage For="@(() => _stockEntry.Fundamentals.AnnualDividend)" class="text-red-500 text-sm" />
+                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-10" />
+
+                    @if (_stockEntry.Fundamentals.AnnualDividend < 0 && _validationAttempted)
+                    {
+                        <div class="bg-red-50 border-l-4 border-red-400 p-2 mt-1 rounded">
+                            <p class="text-xs text-red-700">Annual Dividend cannot be negative</p>
+                        </div>
+                    }
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Total Liabilities (LKR)</label>
                     <div class="relative mt-1">
-                        <div class="flex">
-                            <input type="text"
-                                   value="@_formattedLiabilities"
-                                   @oninput="OnLiabilitiesInput"
-                                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                <span class="text-gray-500 sm:text-sm">e.g. 1.5M, 2.3B</span>
-                            </div>
-                        </div>
-                        <!-- Display actual numeric value -->
-                        <div class="mt-1 text-xs text-gray-600">
-                            Value: @_stockEntry.Fundamentals.TotalLiabilities.ToString("N0") LKR
-                        </div>
+                        <input type="text"
+                               value="@_formattedLiabilities"
+                               @oninput="OnLiabilitiesInput"
+                               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-10" />
                     </div>
-                    <ValidationMessage For="@(() => _stockEntry.Fundamentals.TotalLiabilities)" class="text-red-500 text-sm" />
+                    <div class="mt-1 text-xs text-gray-600">
+                        @_stockEntry.Fundamentals.TotalLiabilities.ToString("N0") LKR
+                    </div>
+
+                    @if (_stockEntry.Fundamentals.TotalLiabilities <= 0 && _validationAttempted)
+                    {
+                        <div class="bg-red-50 border-l-4 border-red-400 p-2 mt-1 rounded">
+                            <p class="text-xs text-red-700">Total Liabilities must be greater than zero</p>
+                        </div>
+                    }
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Total Equity (LKR)</label>
                     <div class="relative mt-1">
-                        <div class="flex">
-                            <input type="text"
-                                   value="@_formattedEquity"
-                                   @oninput="OnEquityInput"
-                                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                <span class="text-gray-500 sm:text-sm">e.g. 1.5M, 2.3B</span>
-                            </div>
-                        </div>
-                        <!-- Display actual numeric value -->
-                        <div class="mt-1 text-xs text-gray-600">
-                            Value: @_stockEntry.Fundamentals.TotalEquity.ToString("N0") LKR
-                        </div>
+                        <input type="text"
+                               value="@_formattedEquity"
+                               @oninput="OnEquityInput"
+                               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-10" />
                     </div>
-                    <ValidationMessage For="@(() => _stockEntry.Fundamentals.TotalEquity)" class="text-red-500 text-sm" />
-                </div>
-            </div>
-        </div>
+                    <div class="mt-1 text-xs text-gray-600">
+                        @_stockEntry.Fundamentals.TotalEquity.ToString("N0") LKR
+                    </div>
 
-        @if (_relatedSymbols.Count > 1)
-        {
-            <div class="mt-6 p-4 bg-indigo-50 rounded-lg">
-                <h4 class="text-sm font-medium text-indigo-800 mb-2">Related Stock Symbols</h4>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-indigo-200">
-                        <thead class="bg-indigo-50">
-                            <tr>
-                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">Symbol</th>
-                                <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-indigo-700 uppercase tracking-wider">Issued Quantity</th>
-                                <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-indigo-700 uppercase tracking-wider">Market Price (LKR)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var relatedSymbol in _relatedSymbols)
-                            {
-                                <tr class="bg-indigo-50">
-                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-indigo-800">
-                                        @relatedSymbol.Symbol
-                                        @if (relatedSymbol.Symbol == _stockEntry.Stock.Symbol)
-                                        {
-                                            <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                                Selected
-                                            </span>
-                                        }
-                                    </td>
-                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-800">@relatedSymbol.IssuedQuantity.ToString("N0")</td>
-                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-800">@relatedSymbol.MarketPrice.ToTwoDecimalPlaces()</td>
-                                </tr>
-                            }
-                            <tr class="bg-indigo-100">
-                                <td class="px-3 py-2 whitespace-nowrap text-sm font-bold text-indigo-900">Total</td>
-                                <td class="px-3 py-2 whitespace-nowrap text-sm font-bold text-right text-indigo-900">@_totalIssuedQuantity.ToString("N0")</td>
-                                <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-900"></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    @if (_stockEntry.Fundamentals.TotalEquity <= 0 && _validationAttempted)
+                    {
+                        <div class="bg-red-50 border-l-4 border-red-400 p-2 mt-1 rounded">
+                            <p class="text-xs text-red-700">Total Equity must be greater than zero</p>
+                        </div>
+                    }
                 </div>
-                <p class="text-xs text-indigo-700 mt-2">
-                    * Total issued quantity is used for NAV calculation (Total Equity / Total Issued Quantity)
-                </p>
             </div>
-        }
+
+            <!-- Related Stock Symbols -->
+            @if (_relatedSymbols.Count > 0)
+            {
+                <div class="col-span-6 p-6 bg-indigo-50 rounded-lg">
+                    <h4 class="text-sm font-medium text-indigo-800 mb-2">Related Stock Symbols</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-indigo-200">
+                            <thead class="bg-indigo-50">
+                                <tr>
+                                    <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">Symbol</th>
+                                    <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-indigo-700 uppercase tracking-wider">Issued Quantity</th>
+                                    <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-indigo-700 uppercase tracking-wider">Market Price (LKR)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var relatedSymbol in _relatedSymbols)
+                                {
+                                    <tr class="bg-indigo-50">
+                                        <td class="px-3 py-2 whitespace-nowrap text-sm text-indigo-800">
+                                            @relatedSymbol.Symbol
+                                            @if (relatedSymbol.Symbol == _stockEntry.Stock.Symbol)
+                                            {
+                                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                                    Selected
+                                                </span>
+                                            }
+                                        </td>
+                                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-800">@relatedSymbol.IssuedQuantity.ToString("N0")</td>
+                                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-800">@relatedSymbol.MarketPrice.ToTwoDecimalPlaces()</td>
+                                    </tr>
+                                }
+                                <tr class="bg-indigo-100">
+                                    <td class="px-3 py-2 whitespace-nowrap text-sm font-bold text-indigo-900">Total</td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-sm font-bold text-right text-indigo-900">@_totalIssuedQuantity.ToString("N0")</td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-900"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-indigo-700 mt-2">
+                        * Total issued quantity is used for NAV calculation (Total Equity / Total Issued Quantity)
+                    </p>
+                </div>
+            }
+        </div>
 
         <div class="mt-6 flex justify-end space-x-4">
             <button type="button"
@@ -291,8 +326,9 @@
                     @onclick="NavigateBack">
                 Cancel
             </button>
-            <button type="submit"
-                    class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <button type="button"
+                    class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    @onclick="ValidateAndSubmit">
                 Save Stock
             </button>
         </div>
