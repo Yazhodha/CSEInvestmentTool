@@ -1,5 +1,6 @@
 using CSEInvestmentTool.Application.Models;
 using CSEInvestmentTool.Domain.Models;
+using CSEInvestmentTool.Web.Helpers;
 using Microsoft.AspNetCore.Components;
 using System.Timers;
 
@@ -13,6 +14,10 @@ namespace CSEInvestmentTool.Web.Pages
         private bool _symbolFound = false;
         private List<StockSymbolInfo> _relatedSymbols = new();
         private long _totalIssuedQuantity = 0;
+
+        // Formatted inputs
+        private string _formattedLiabilities = string.Empty;
+        private string _formattedEquity = string.Empty;
 
         // Debounce timer for symbol input
         private System.Timers.Timer? _debounceTimer;
@@ -105,8 +110,8 @@ namespace CSEInvestmentTool.Web.Pages
                         _stockEntry.Stock.CompanyName = stockData.CompanyName;
                     }
 
-                    // Set market price
-                    _stockEntry.Fundamentals.MarketPrice = stockData.MarketPrice;
+                    // Set market price (rounded to 2 decimal places)
+                    _stockEntry.Fundamentals.MarketPrice = Math.Round(stockData.MarketPrice, 2);
 
                     // Get related symbols
                     _relatedSymbols = await StockCalculationService.GetRelatedStockSymbolsAsync(symbol);
@@ -139,11 +144,26 @@ namespace CSEInvestmentTool.Web.Pages
             }
         }
 
-        private async Task OnTotalEquityChangedAsync(ChangeEventArgs e)
+        private void OnLiabilitiesInput(ChangeEventArgs e)
         {
-            if (decimal.TryParse(e.Value?.ToString(), out decimal totalEquity))
+            var input = e.Value?.ToString() ?? string.Empty;
+            _formattedLiabilities = input;
+
+            // Parse the formatted input to get the actual value
+            _stockEntry.Fundamentals.TotalLiabilities = DecimalFormatter.ParseShortForm(input);
+        }
+
+        private async Task OnEquityInput(ChangeEventArgs e)
+        {
+            var input = e.Value?.ToString() ?? string.Empty;
+            _formattedEquity = input;
+
+            // Parse the formatted input to get the actual value
+            _stockEntry.Fundamentals.TotalEquity = DecimalFormatter.ParseShortForm(input);
+
+            // If we have the total issued quantity, calculate NAV
+            if (_totalIssuedQuantity > 0 && _symbolFound)
             {
-                _stockEntry.Fundamentals.TotalEquity = totalEquity;
                 await CalculateNAVAsync();
             }
         }
@@ -157,7 +177,8 @@ namespace CSEInvestmentTool.Web.Pages
 
             try
             {
-                decimal nav = _stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity;
+                // Calculate NAV and round to 2 decimal places
+                decimal nav = Math.Round(_stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity, 2);
                 _stockEntry.Fundamentals.NAV = nav;
                 StateHasChanged();
             }
@@ -188,10 +209,10 @@ namespace CSEInvestmentTool.Web.Pages
                     return;
                 }
 
-                // Make sure NAV is calculated
+                // Make sure NAV is calculated and rounded to 2 decimal places
                 if (_stockEntry.Fundamentals.NAV <= 0 && _totalIssuedQuantity > 0)
                 {
-                    _stockEntry.Fundamentals.NAV = _stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity;
+                    _stockEntry.Fundamentals.NAV = Math.Round(_stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity, 2);
                 }
 
                 // Set last updated timestamp

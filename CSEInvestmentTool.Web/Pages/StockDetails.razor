@@ -1,6 +1,7 @@
 ﻿@page "/stocks/{Id:int}"
 @using CSEInvestmentTool.Domain.Models
 @using CSEInvestmentTool.Application.Interfaces
+@using CSEInvestmentTool.Web.Helpers
 @inject IStockRepository StockRepository
 @inject IFundamentalDataRepository FundamentalRepository
 @inject IStockScoreRepository ScoreRepository
@@ -136,27 +137,33 @@
                         <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Market Price</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.MarketPrice.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.MarketPrice.ToTwoDecimalPlaces() LKR</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">NAV</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.NAV.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.NAV.ToTwoDecimalPlaces() LKR</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">EPS</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.EPS.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.EPS.ToTwoDecimalPlaces() LKR</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Annual Dividend</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.AnnualDividend.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.AnnualDividend.ToTwoDecimalPlaces() LKR</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Total Liabilities</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.TotalLiabilities.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    <span class="mr-1">@_fundamentalData.TotalLiabilities.ToShortForm() LKR</span>
+                                    <span class="text-xs text-gray-500">(@_fundamentalData.TotalLiabilities.ToString("N0") LKR)</span>
+                                </dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Total Equity</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.TotalEquity.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    <span class="mr-1">@_fundamentalData.TotalEquity.ToShortForm() LKR</span>
+                                    <span class="text-xs text-gray-500">(@_fundamentalData.TotalEquity.ToString("N0") LKR)</span>
+                                </dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Data Date</dt>
@@ -175,31 +182,32 @@
                         <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">P/E Ratio</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.PERatio?.ToString("N2") ?? "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.PERatio?.ToTwoDecimalPlaces() ?? "N/A")</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Return on Equity (ROE)</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.ROE.HasValue ? $"{_fundamentalData.ROE.Value:N2}%" : "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.ROE.HasValue ? $"{_fundamentalData.ROE.Value.ToTwoDecimalPlaces()}%" : "N/A")</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Dividend Yield</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.DividendYield.HasValue ? $"{_fundamentalData.DividendYield.Value:N2}%" : "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.DividendYield.HasValue ? $"{_fundamentalData.DividendYield.Value.ToTwoDecimalPlaces()}%" : "N/A")</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Debt to Equity Ratio</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.DebtToEquityRatio?.ToString("N2") ?? "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.DebtToEquityRatio?.ToTwoDecimalPlaces() ?? "N/A")</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Price to Book Value (PBV)</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.PBV?.ToString("N2") ?? "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.PBV?.ToTwoDecimalPlaces() ?? "N/A")</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Return (%)</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.Return.HasValue ? $"{_fundamentalData.Return.Value:N2}%" : "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.Return.HasValue ? $"{_fundamentalData.Return.Value.ToTwoDecimalPlaces()}%" : "N/A")</dd>
                             </div>
                         </dl>
                     </div>
                 </div>
+
             }
             else
             {
@@ -247,7 +255,7 @@
                                             @symbol.IssuedQuantity.ToString("N0")
                                         </td>
                                         <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
-                                            @symbol.MarketPrice.ToString("N2")
+                                            @symbol.MarketPrice.ToTwoDecimalPlaces()
                                         </td>
                                     </tr>
                                 }

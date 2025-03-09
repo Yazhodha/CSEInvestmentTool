@@ -3,7 +3,7 @@
 @using CSEInvestmentTool.Domain.Models
 @using CSEInvestmentTool.Application.Interfaces
 @using Microsoft.AspNetCore.Components
-
+@using CSEInvestmentTool.Web.Helpers
 @inject IStockRepository StockRepository
 @inject IFundamentalDataRepository FundamentalRepository
 @inject IStockScoreRepository ScoreRepository
@@ -93,7 +93,7 @@
                             @if (score != null)
                             {
                                 <div class="@GetScoreBadgeClass(score.TotalScore)">
-                                    @score.TotalScore.ToString("N1")
+                                    @score.TotalScore.ToTwoDecimalPlaces()
                                 </div>
                             }
                         </div>
@@ -102,25 +102,25 @@
                             <div>
                                 <p class="text-xs text-gray-500">Market Price</p>
                                 <p class="text-sm font-semibold">
-                                    @(fundamentals?.MarketPrice.ToString("N2") ?? "N/A") LKR
+                                    @(fundamentals?.MarketPrice.ToTwoDecimalPlaces() ?? "N/A") LKR
                                 </p>
                             </div>
                             <div>
                                 <p class="text-xs text-gray-500">NAV</p>
                                 <p class="text-sm font-semibold">
-                                    @(fundamentals?.NAV.ToString("N2") ?? "N/A") LKR
+                                    @(fundamentals?.NAV.ToTwoDecimalPlaces() ?? "N/A") LKR
                                 </p>
                             </div>
                             <div>
                                 <p class="text-xs text-gray-500">EPS</p>
                                 <p class="text-sm font-semibold">
-                                    @(fundamentals?.EPS.ToString("N2") ?? "N/A") LKR
+                                    @(fundamentals?.EPS.ToTwoDecimalPlaces() ?? "N/A") LKR
                                 </p>
                             </div>
                             <div>
                                 <p class="text-xs text-gray-500">Dividend</p>
                                 <p class="text-sm font-semibold">
-                                    @(fundamentals?.AnnualDividend.ToString("N2") ?? "N/A") LKR
+                                    @(fundamentals?.AnnualDividend.ToTwoDecimalPlaces() ?? "N/A") LKR
                                 </p>
                             </div>
                         </div>
@@ -129,25 +129,25 @@
                             <div>
                                 <p class="text-xs text-gray-500">P/E</p>
                                 <p class="text-sm font-semibold">
-                                    @(fundamentals?.PERatio?.ToString("N2") ?? "N/A")
+                                    @(fundamentals?.PERatio?.ToTwoDecimalPlaces() ?? "N/A")
                                 </p>
                             </div>
                             <div>
                                 <p class="text-xs text-gray-500">ROE</p>
                                 <p class="text-sm font-semibold">
-                                    @(fundamentals?.ROE != null ? $"{fundamentals.ROE:N2}%" : "N/A")
+                                    @(fundamentals?.ROE != null ? $"{fundamentals.ROE.Value.ToTwoDecimalPlaces()}%" : "N/A")
                                 </p>
                             </div>
                             <div>
                                 <p class="text-xs text-gray-500">Dividend Yield</p>
                                 <p class="text-sm font-semibold">
-                                    @(fundamentals?.DividendYield != null ? $"{fundamentals.DividendYield:N2}%" : "N/A")
+                                    @(fundamentals?.DividendYield != null ? $"{fundamentals.DividendYield.Value.ToTwoDecimalPlaces()}%" : "N/A")
                                 </p>
                             </div>
                             <div>
                                 <p class="text-xs text-gray-500">Debt/Equity</p>
                                 <p class="text-sm font-semibold">
-                                    @(fundamentals?.DebtToEquityRatio?.ToString("N2") ?? "N/A")
+                                    @(fundamentals?.DebtToEquityRatio?.ToTwoDecimalPlaces() ?? "N/A")
                                 </p>
                             </div>
                         </div>

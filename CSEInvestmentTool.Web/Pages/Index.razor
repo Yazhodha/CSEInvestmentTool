@@ -2,7 +2,7 @@
 @using CSEInvestmentTool.Domain.Models
 @using CSEInvestmentTool.Application.Services
 @using CSEInvestmentTool.Application.Interfaces
-
+@using CSEInvestmentTool.Web.Helpers
 @inject ILogger<Index> Logger
 @inject IStockScoreRepository ScoreRepository
 @inject IInvestmentAllocationService AllocationService
@@ -49,7 +49,7 @@
                     <div>
                         <p class="text-sm text-gray-500">Average Score</p>
                         <p class="text-2xl font-bold text-green-700 mt-1">
-                            @(_scores.Any() ? (_scores.Average(s => s.TotalScore)).ToString("N1") : "N/A")
+                            @(_scores.Any() ? (_scores.Average(s => s.TotalScore)).ToTwoDecimalPlaces() : "N/A")
                         </p>
                     </div>
                     <div class="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
@@ -105,13 +105,14 @@
                                         <div class="text-sm text-gray-900">
                                             @{
                                                 var score = _scores.FirstOrDefault(s => s.StockId == recommendation.StockId);
-                                                @(score?.TotalScore.ToString("N1") ?? "N/A")
+                                                @(score?.TotalScore.ToTwoDecimalPlaces() ?? "N/A")
                                             }
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="text-sm text-gray-900">
-                                            LKR @recommendation.RecommendedAmount.ToString("N2")
+                                            LKR @recommendation.RecommendedAmount.ToShortForm()
+                                            <span class="text-xs text-gray-500">(@recommendation.RecommendedAmount.ToString("N0"))</span>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">

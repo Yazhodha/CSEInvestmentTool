@@ -159,7 +159,9 @@ public class StockScoringService : IStockScoringService
         }
 
         // Calculate NAV/Price ratio (higher is better as it indicates undervaluation)
-        decimal navPriceRatio = nav / price;
+        // Make sure we're using the NAV value with two decimal places for consistency
+        decimal roundedNav = Math.Round(nav, 2);
+        decimal navPriceRatio = roundedNav / price;
 
         var score = navPriceRatio switch
         {
@@ -170,8 +172,8 @@ public class StockScoringService : IStockScoringService
             _ => 100 // Significantly undervalued
         };
 
-        _logger.LogDebug("NAV/Price Score calculated: {Score} for ratio: {Ratio}",
-            score, navPriceRatio);
+        _logger.LogDebug("NAV/Price Score calculated: {Score} for ratio: {Ratio} (NAV: {NAV}, Price: {Price})",
+            score, navPriceRatio, roundedNav, price);
         return score;
     }
 }

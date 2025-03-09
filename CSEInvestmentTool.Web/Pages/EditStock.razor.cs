@@ -1,5 +1,6 @@
 using CSEInvestmentTool.Application.Models;
 using CSEInvestmentTool.Domain.Models;
+using CSEInvestmentTool.Web.Helpers;
 using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,7 +17,11 @@ namespace CSEInvestmentTool.Web.Pages
         private string? _errorMessage;
         private bool _loading = true;
 
-        // New properties for API integration
+        // Formatted inputs
+        private string _formattedLiabilities = string.Empty;
+        private string _formattedEquity = string.Empty;
+
+        // Related symbols info
         private List<StockSymbolInfo> _relatedSymbols = new();
         private long _totalIssuedQuantity = 0;
 
@@ -75,14 +80,18 @@ namespace CSEInvestmentTool.Web.Pages
                             // Don't set FundamentalId for a new record
                             StockId = _stock.StockId,
                             Date = DateTime.UtcNow.Date, // Use current date for new entry
-                            MarketPrice = marketPrice > 0 ? marketPrice : _fundamentalData.MarketPrice,
-                            NAV = _fundamentalData.NAV,
+                            MarketPrice = Math.Round(marketPrice > 0 ? marketPrice : _fundamentalData.MarketPrice, 2),
+                            NAV = Math.Round(_fundamentalData.NAV, 2),
                             EPS = _fundamentalData.EPS,
                             AnnualDividend = _fundamentalData.AnnualDividend,
                             TotalLiabilities = _fundamentalData.TotalLiabilities,
                             TotalEquity = _fundamentalData.TotalEquity,
                             LastUpdated = DateTime.UtcNow
                         };
+
+                        // Set formatted values for display
+                        _formattedLiabilities = _stockEntry.Fundamentals.TotalLiabilities.ToShortForm();
+                        _formattedEquity = _stockEntry.Fundamentals.TotalEquity.ToShortForm();
                     }
                     else
                     {
@@ -91,7 +100,7 @@ namespace CSEInvestmentTool.Web.Pages
                         {
                             StockId = _stock.StockId,
                             Date = DateTime.UtcNow.Date,
-                            MarketPrice = marketPrice,
+                            MarketPrice = Math.Round(marketPrice, 2),
                             LastUpdated = DateTime.UtcNow
                         };
                     }
@@ -108,13 +117,25 @@ namespace CSEInvestmentTool.Web.Pages
             }
         }
 
-        private async Task OnTotalEquityChangedAsync(ChangeEventArgs e)
+        private void OnLiabilitiesInput(ChangeEventArgs e)
         {
-            if (decimal.TryParse(e.Value?.ToString(), out decimal totalEquity))
-            {
-                _stockEntry.Fundamentals.TotalEquity = totalEquity;
-                await CalculateNAVAsync();
-            }
+            var input = e.Value?.ToString() ?? string.Empty;
+            _formattedLiabilities = input;
+
+            // Parse the formatted input to get the actual value
+            _stockEntry.Fundamentals.TotalLiabilities = DecimalFormatter.ParseShortForm(input);
+        }
+
+        private async Task OnEquityInput(ChangeEventArgs e)
+        {
+            var input = e.Value?.ToString() ?? string.Empty;
+            _formattedEquity = input;
+
+            // Parse the formatted input to get the actual value
+            _stockEntry.Fundamentals.TotalEquity = DecimalFormatter.ParseShortForm(input);
+
+            // Calculate NAV if we have required values
+            await CalculateNAVAsync();
         }
 
         private async Task CalculateNAVAsync()
@@ -126,7 +147,7 @@ namespace CSEInvestmentTool.Web.Pages
 
             try
             {
-                decimal nav = _stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity;
+                decimal nav = Math.Round(_stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity, 2);
                 _stockEntry.Fundamentals.NAV = nav;
                 StateHasChanged();
             }
@@ -148,10 +169,10 @@ namespace CSEInvestmentTool.Web.Pages
                     return;
                 }
 
-                // Make sure NAV is calculated
+                // Make sure NAV is calculated and rounded to 2 decimal places
                 if (_stockEntry.Fundamentals.NAV <= 0 && _totalIssuedQuantity > 0)
                 {
-                    _stockEntry.Fundamentals.NAV = _stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity;
+                    _stockEntry.Fundamentals.NAV = Math.Round(_stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity, 2);
                 }
 
                 // We're not updating stock properties anymore, only fundamental data
@@ -164,8 +185,8 @@ namespace CSEInvestmentTool.Web.Pages
                 {
                     StockId = _stock.StockId,
                     Date = DateTime.UtcNow.Date,
-                    MarketPrice = _stockEntry.Fundamentals.MarketPrice,
-                    NAV = _stockEntry.Fundamentals.NAV,
+                    MarketPrice = Math.Round(_stockEntry.Fundamentals.MarketPrice, 2),
+                    NAV = Math.Round(_stockEntry.Fundamentals.NAV, 2),
                     EPS = _stockEntry.Fundamentals.EPS,
                     AnnualDividend = _stockEntry.Fundamentals.AnnualDividend,
                     TotalLiabilities = _stockEntry.Fundamentals.TotalLiabilities,
