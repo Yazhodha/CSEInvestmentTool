@@ -14,6 +14,7 @@ builder.Services.AddControllers();
 
 // Add HttpClient
 builder.Services.AddHttpClient();
+builder.Services.AddMemoryCache();
 
 // Register services
 builder.Services.AddScoped<IDataCollectionService, CSEDataCollectionService>();
@@ -34,6 +35,8 @@ builder.Services.AddScoped<IFundamentalDataRepository, FundamentalDataRepository
 builder.Services.AddScoped<IStockScoreRepository, StockScoreRepository>();
 builder.Services.AddScoped<IInvestmentRecommendationRepository, InvestmentRecommendationRepository>();
 builder.Services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
+builder.Services.AddScoped<ICSEApiService, CSEApiService>();
+builder.Services.AddScoped<IStockCalculationService, StockCalculationService>();
 
 // Register TestDataSeeder
 builder.Services.AddScoped<TestDataSeeder>();

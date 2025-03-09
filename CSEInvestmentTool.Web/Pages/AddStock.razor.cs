@@ -1,29 +1,40 @@
+using CSEInvestmentTool.Application.Models;
 using CSEInvestmentTool.Domain.Models;
 using Microsoft.AspNetCore.Components;
+using System.Timers;
 
 namespace CSEInvestmentTool.Web.Pages
 {
-    public partial class AddStock
+    public partial class AddStock : IDisposable
     {
         private StockEntryModel _stockEntry = new();
         private string? _errorMessage;
+        private bool _loadingSymbol = false;
+        private bool _symbolFound = false;
+        private List<StockSymbolInfo> _relatedSymbols = new();
+        private long _totalIssuedQuantity = 0;
+
+        // Debounce timer for symbol input
+        private System.Timers.Timer? _debounceTimer;
+        private string _currentSymbolInput = string.Empty;
+
         private readonly List<string> _sectors = new()
-    {
-        "Banks",
-        "Diversified Holdings",
-        "Telecommunications",
-        "Manufacturing",
-        "Hotels & Travel",
-        "Beverage Food & Tobacco",
-        "Insurance",
-        "Construction & Engineering",
-        "Power & Energy",
-        "Healthcare",
-        "Investment Trusts",
-        "Trading",
-        "Transportation",
-        "Plantations"
-    };
+        {
+            "Banks",
+            "Diversified Holdings",
+            "Telecommunications",
+            "Manufacturing",
+            "Hotels & Travel",
+            "Beverage Food & Tobacco",
+            "Insurance",
+            "Construction & Engineering",
+            "Power & Energy",
+            "Healthcare",
+            "Investment Trusts",
+            "Trading",
+            "Transportation",
+            "Plantations"
+        };
 
         protected override void OnInitialized()
         {
@@ -31,6 +42,129 @@ namespace CSEInvestmentTool.Web.Pages
             _stockEntry.Stock.IsActive = true;
             _stockEntry.Fundamentals.Date = DateTime.UtcNow.Date;
             _stockEntry.Fundamentals.LastUpdated = DateTime.UtcNow;
+
+            // Initialize debounce timer
+            _debounceTimer = new System.Timers.Timer(500); // 500ms delay
+            _debounceTimer.Elapsed += OnDebounceElapsed;
+            _debounceTimer.AutoReset = false;
+        }
+
+        private async void OnDebounceElapsed(object? sender, ElapsedEventArgs e)
+        {
+            // This runs after the debounce timer elapses
+            await InvokeAsync(async () =>
+            {
+                await FetchStockDataAsync(_currentSymbolInput);
+                StateHasChanged();
+            });
+        }
+
+        private async Task OnSymbolInputAsync(ChangeEventArgs e)
+        {
+            _symbolFound = false;
+            _relatedSymbols.Clear();
+            _totalIssuedQuantity = 0;
+            _stockEntry.Fundamentals.MarketPrice = 0;
+            _stockEntry.Fundamentals.NAV = 0;
+
+            var symbol = e.Value?.ToString();
+            if (string.IsNullOrWhiteSpace(symbol))
+            {
+                return;
+            }
+
+            // Store current input and restart debounce timer
+            _currentSymbolInput = symbol;
+            _debounceTimer?.Stop();
+            _debounceTimer?.Start();
+        }
+
+        private async Task FetchStockDataAsync(string symbol)
+        {
+            try
+            {
+                _loadingSymbol = true;
+                StateHasChanged();
+
+                if (string.IsNullOrWhiteSpace(symbol) || symbol.Length < 3)
+                {
+                    return;
+                }
+
+                // Get stock data from API
+                var stockData = await StockCalculationService.GetStockDataBySymbolAsync(symbol);
+
+                if (stockData != null)
+                {
+                    // Stock found
+                    _symbolFound = true;
+
+                    // Update company name if it's empty
+                    if (string.IsNullOrEmpty(_stockEntry.Stock.CompanyName))
+                    {
+                        _stockEntry.Stock.CompanyName = stockData.CompanyName;
+                    }
+
+                    // Set market price
+                    _stockEntry.Fundamentals.MarketPrice = stockData.MarketPrice;
+
+                    // Get related symbols
+                    _relatedSymbols = await StockCalculationService.GetRelatedStockSymbolsAsync(symbol);
+
+                    // Calculate total issued quantity
+                    _totalIssuedQuantity = _relatedSymbols.Sum(s => s.IssuedQuantity);
+
+                    // If total equity is already provided, calculate NAV
+                    if (_stockEntry.Fundamentals.TotalEquity > 0)
+                    {
+                        await CalculateNAVAsync();
+                    }
+                }
+                else
+                {
+                    // Stock not found
+                    _symbolFound = false;
+                    _relatedSymbols.Clear();
+                    _totalIssuedQuantity = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error fetching stock data for symbol {Symbol}", symbol);
+            }
+            finally
+            {
+                _loadingSymbol = false;
+                StateHasChanged();
+            }
+        }
+
+        private async Task OnTotalEquityChangedAsync(ChangeEventArgs e)
+        {
+            if (decimal.TryParse(e.Value?.ToString(), out decimal totalEquity))
+            {
+                _stockEntry.Fundamentals.TotalEquity = totalEquity;
+                await CalculateNAVAsync();
+            }
+        }
+
+        private async Task CalculateNAVAsync()
+        {
+            if (_stockEntry.Fundamentals.TotalEquity <= 0 || _totalIssuedQuantity <= 0 || !_symbolFound)
+            {
+                return;
+            }
+
+            try
+            {
+                decimal nav = _stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity;
+                _stockEntry.Fundamentals.NAV = nav;
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error calculating NAV");
+            }
         }
 
         private async Task HandleValidSubmit()
@@ -38,6 +172,27 @@ namespace CSEInvestmentTool.Web.Pages
             try
             {
                 _errorMessage = null;
+
+                // Validate that we have the necessary data
+                if (!_symbolFound)
+                {
+                    _errorMessage = "Please enter a valid stock symbol.";
+                    StateHasChanged();
+                    return;
+                }
+
+                if (_stockEntry.Fundamentals.TotalEquity <= 0)
+                {
+                    _errorMessage = "Total Equity must be greater than zero.";
+                    StateHasChanged();
+                    return;
+                }
+
+                // Make sure NAV is calculated
+                if (_stockEntry.Fundamentals.NAV <= 0 && _totalIssuedQuantity > 0)
+                {
+                    _stockEntry.Fundamentals.NAV = _stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity;
+                }
 
                 // Set last updated timestamp
                 _stockEntry.Stock.LastUpdated = DateTime.UtcNow;
@@ -55,8 +210,7 @@ namespace CSEInvestmentTool.Web.Pages
                 var score = ScoringService.CalculateScore(_stockEntry.Fundamentals);
                 await ScoreRepository.AddStockScoreAsync(score);
 
-                Logger.LogInformation("Successfully added new stock: {Symbol}",
-                    _stockEntry.Stock.Symbol);
+                Logger.LogInformation("Successfully added new stock: {Symbol}", _stockEntry.Stock.Symbol);
 
                 // Navigate back to the stocks list
                 NavigationManager.NavigateTo("/stocks");
@@ -89,6 +243,12 @@ namespace CSEInvestmentTool.Web.Pages
         private void NavigateBack()
         {
             NavigationManager.NavigateTo("/stocks");
+        }
+
+        public void Dispose()
+        {
+            // Dispose the timer when the component is disposed
+            _debounceTimer?.Dispose();
         }
 
         private class StockEntryModel

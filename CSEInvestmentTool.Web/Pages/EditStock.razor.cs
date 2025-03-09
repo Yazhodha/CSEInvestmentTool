@@ -1,3 +1,4 @@
+using CSEInvestmentTool.Application.Models;
 using CSEInvestmentTool.Domain.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,11 @@ namespace CSEInvestmentTool.Web.Pages
         private FundamentalData? _fundamentalData;
         private string? _errorMessage;
         private bool _loading = true;
+
+        // New properties for API integration
+        private List<StockSymbolInfo> _relatedSymbols = new();
+        private long _totalIssuedQuantity = 0;
+
         private readonly List<string> _sectors = new()
         {
             "Banks",
@@ -48,6 +54,13 @@ namespace CSEInvestmentTool.Web.Pages
 
                 if (_stock != null)
                 {
+                    // Get related symbols from API
+                    _relatedSymbols = await StockCalculationService.GetRelatedStockSymbolsAsync(_stock.Symbol);
+                    _totalIssuedQuantity = _relatedSymbols.Sum(s => s.IssuedQuantity);
+
+                    // Get latest market price
+                    var marketPrice = await StockCalculationService.GetMarketPriceAsync(_stock.Symbol);
+
                     // Load fundamental data
                     _fundamentalData = await FundamentalRepository.GetLatestFundamentalDataForStockAsync(Id);
 
@@ -62,7 +75,7 @@ namespace CSEInvestmentTool.Web.Pages
                             // Don't set FundamentalId for a new record
                             StockId = _stock.StockId,
                             Date = DateTime.UtcNow.Date, // Use current date for new entry
-                            MarketPrice = _fundamentalData.MarketPrice,
+                            MarketPrice = marketPrice > 0 ? marketPrice : _fundamentalData.MarketPrice,
                             NAV = _fundamentalData.NAV,
                             EPS = _fundamentalData.EPS,
                             AnnualDividend = _fundamentalData.AnnualDividend,
@@ -78,6 +91,7 @@ namespace CSEInvestmentTool.Web.Pages
                         {
                             StockId = _stock.StockId,
                             Date = DateTime.UtcNow.Date,
+                            MarketPrice = marketPrice,
                             LastUpdated = DateTime.UtcNow
                         };
                     }
@@ -94,6 +108,34 @@ namespace CSEInvestmentTool.Web.Pages
             }
         }
 
+        private async Task OnTotalEquityChangedAsync(ChangeEventArgs e)
+        {
+            if (decimal.TryParse(e.Value?.ToString(), out decimal totalEquity))
+            {
+                _stockEntry.Fundamentals.TotalEquity = totalEquity;
+                await CalculateNAVAsync();
+            }
+        }
+
+        private async Task CalculateNAVAsync()
+        {
+            if (_stockEntry.Fundamentals.TotalEquity <= 0 || _totalIssuedQuantity <= 0)
+            {
+                return;
+            }
+
+            try
+            {
+                decimal nav = _stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity;
+                _stockEntry.Fundamentals.NAV = nav;
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error calculating NAV");
+            }
+        }
+
         private async Task HandleValidSubmit()
         {
             try
@@ -104,6 +146,12 @@ namespace CSEInvestmentTool.Web.Pages
                 {
                     _errorMessage = "Stock not found.";
                     return;
+                }
+
+                // Make sure NAV is calculated
+                if (_stockEntry.Fundamentals.NAV <= 0 && _totalIssuedQuantity > 0)
+                {
+                    _stockEntry.Fundamentals.NAV = _stockEntry.Fundamentals.TotalEquity / _totalIssuedQuantity;
                 }
 
                 // We're not updating stock properties anymore, only fundamental data
@@ -139,7 +187,7 @@ namespace CSEInvestmentTool.Web.Pages
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error updating stock: {Symbol}", _stock.Symbol);
+                Logger.LogError(ex, "Error updating stock: {Symbol}", _stock?.Symbol);
 
                 if (ex is InvalidOperationException)
                 {
@@ -148,7 +196,7 @@ namespace CSEInvestmentTool.Web.Pages
                 else if (ex is DbUpdateException dbUpdateEx)
                 {
                     _errorMessage = "Database error: Unable to update stock data. Please try again.";
-                    Logger.LogError(dbUpdateEx, "Database error updating stock: {Symbol}", _stock.Symbol);
+                    Logger.LogError(dbUpdateEx, "Database error updating stock: {Symbol}", _stock?.Symbol);
                 }
                 else
                 {

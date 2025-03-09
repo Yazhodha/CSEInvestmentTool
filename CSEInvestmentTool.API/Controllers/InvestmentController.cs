@@ -1,7 +1,7 @@
-using Microsoft.AspNetCore.Mvc;
 using CSEInvestmentTool.Application.Services;
 using CSEInvestmentTool.Domain.Models;
 using CSEInvestmentTool.Infrastructure.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace CSEInvestmentTool.API.Controllers;
 
@@ -91,7 +91,7 @@ public class InvestmentController : ControllerBase
             }
 
             // Calculate recommendations
-            var recommendations = _allocationService.CalculateInvestmentAllocations(
+            var recommendations = _allocationService.CalculateInvestmentAllocationsAsync(
                 scores,
                 DateTime.UtcNow.Date);
 
@@ -120,7 +120,7 @@ public class InvestmentController : ControllerBase
                 scores.Add(score);
             }
 
-            var recommendations = _allocationService.CalculateInvestmentAllocations(
+            var recommendations = _allocationService.CalculateInvestmentAllocationsAsync(
                 scores,
                 DateTime.UtcNow.Date);
 
@@ -129,7 +129,7 @@ public class InvestmentController : ControllerBase
                 Stocks = stocks,
                 Scores = scores,
                 FundamentalsData = fundamentalsData,
-                Recommendations = recommendations
+                Recommendations = await recommendations
             });
         }
         catch (Exception ex)

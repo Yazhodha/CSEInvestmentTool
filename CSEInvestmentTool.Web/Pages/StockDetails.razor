@@ -209,6 +209,62 @@
             }
         </div>
 
+        @if (_relatedSymbols.Count > 1)
+        {
+            <div class="bg-white shadow overflow-hidden rounded-lg">
+                <div class="px-4 py-5 sm:px-6 bg-gray-50">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Related Stock Symbols</h3>
+                </div>
+                <div class="border-t border-gray-200 px-4 py-5 sm:p-6">
+                    <p class="text-sm text-gray-600 mb-4">
+                        This company has multiple stock types. The following breakdown shows all related symbols and their issued quantities.
+                        The total issued quantity is used in the NAV calculation (Total Equity / Total Issued Quantity).
+                    </p>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbol</th>
+                                    <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Issued Quantity</th>
+                                    <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Market Price (LKR)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @foreach (var symbol in _relatedSymbols)
+                                {
+                                    <tr>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            @symbol.Symbol
+                                            @if (symbol.Symbol == _stock?.Symbol)
+                                            {
+                                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                                    Current
+                                                </span>
+                                            }
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
+                                            @symbol.IssuedQuantity.ToString("N0")
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
+                                            @symbol.MarketPrice.ToString("N2")
+                                        </td>
+                                    </tr>
+                                }
+                                <tr class="bg-gray-50">
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">Total</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-right text-gray-900">
+                                        @_totalIssuedQuantity.ToString("N0")
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+
         @if (_showDeleteConfirmation)
         {
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">

@@ -1,3 +1,5 @@
+using CSEInvestmentTool.Application.Interfaces;
+using CSEInvestmentTool.Application.Models;
 using CSEInvestmentTool.Domain.Models;
 using Microsoft.AspNetCore.Components;
 
@@ -13,6 +15,13 @@ namespace CSEInvestmentTool.Web.Pages
         private StockScore? _stockScore;
         private bool _loading = true;
         private bool _showDeleteConfirmation = false;
+
+        // New properties for API integration
+        private List<StockSymbolInfo> _relatedSymbols = new();
+        private long _totalIssuedQuantity = 0;
+
+        [Inject]
+        private IStockCalculationService StockCalculationService { get; set; } = default!;
 
         protected override async Task OnInitializedAsync()
         {
@@ -35,6 +44,10 @@ namespace CSEInvestmentTool.Web.Pages
 
                     // Load score
                     _stockScore = await ScoreRepository.GetLatestScoreForStockAsync(Id);
+
+                    // Load related symbols info
+                    _relatedSymbols = await StockCalculationService.GetRelatedStockSymbolsAsync(_stock.Symbol);
+                    _totalIssuedQuantity = _relatedSymbols.Sum(s => s.IssuedQuantity);
                 }
             }
             catch (Exception ex)
