@@ -1,6 +1,7 @@
 ﻿@page "/stocks/{Id:int}"
 @using CSEInvestmentTool.Domain.Models
 @using CSEInvestmentTool.Application.Interfaces
+@using CSEInvestmentTool.Web.Helpers
 @inject IStockRepository StockRepository
 @inject IFundamentalDataRepository FundamentalRepository
 @inject IStockScoreRepository ScoreRepository
@@ -136,27 +137,33 @@
                         <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Market Price</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.MarketPrice.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.MarketPrice.ToTwoDecimalPlaces() LKR</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">NAV</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.NAV.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.NAV.ToTwoDecimalPlaces() LKR</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">EPS</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.EPS.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.EPS.ToTwoDecimalPlaces() LKR</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Annual Dividend</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.AnnualDividend.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.AnnualDividend.ToTwoDecimalPlaces() LKR</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Total Liabilities</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.TotalLiabilities.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    <span class="mr-1">@_fundamentalData.TotalLiabilities.ToShortForm() LKR</span>
+                                    <span class="text-xs text-gray-500">(@_fundamentalData.TotalLiabilities.ToString("N0") LKR)</span>
+                                </dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Total Equity</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@_fundamentalData.TotalEquity.ToString("N2") LKR</dd>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    <span class="mr-1">@_fundamentalData.TotalEquity.ToShortForm() LKR</span>
+                                    <span class="text-xs text-gray-500">(@_fundamentalData.TotalEquity.ToString("N0") LKR)</span>
+                                </dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Data Date</dt>
@@ -175,31 +182,32 @@
                         <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">P/E Ratio</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.PERatio?.ToString("N2") ?? "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.PERatio?.ToTwoDecimalPlaces() ?? "N/A")</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Return on Equity (ROE)</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.ROE.HasValue ? $"{_fundamentalData.ROE.Value:N2}%" : "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.ROE.HasValue ? $"{_fundamentalData.ROE.Value.ToTwoDecimalPlaces()}%" : "N/A")</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Dividend Yield</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.DividendYield.HasValue ? $"{_fundamentalData.DividendYield.Value:N2}%" : "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.DividendYield.HasValue ? $"{_fundamentalData.DividendYield.Value.ToTwoDecimalPlaces()}%" : "N/A")</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Debt to Equity Ratio</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.DebtToEquityRatio?.ToString("N2") ?? "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.DebtToEquityRatio?.ToTwoDecimalPlaces() ?? "N/A")</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Price to Book Value (PBV)</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.PBV?.ToString("N2") ?? "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.PBV?.ToTwoDecimalPlaces() ?? "N/A")</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Return (%)</dt>
-                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.Return.HasValue ? $"{_fundamentalData.Return.Value:N2}%" : "N/A")</dd>
+                                <dd class="mt-1 text-sm text-gray-900">@(_fundamentalData.Return.HasValue ? $"{_fundamentalData.Return.Value.ToTwoDecimalPlaces()}%" : "N/A")</dd>
                             </div>
                         </dl>
                     </div>
                 </div>
+
             }
             else
             {
@@ -208,6 +216,62 @@
                 </div>
             }
         </div>
+
+        @if (_relatedSymbols.Count > 1)
+        {
+            <div class="bg-white shadow overflow-hidden rounded-lg">
+                <div class="px-4 py-5 sm:px-6 bg-gray-50">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Related Stock Symbols</h3>
+                </div>
+                <div class="border-t border-gray-200 px-4 py-5 sm:p-6">
+                    <p class="text-sm text-gray-600 mb-4">
+                        This company has multiple stock types. The following breakdown shows all related symbols and their issued quantities.
+                        The total issued quantity is used in the NAV calculation (Total Equity / Total Issued Quantity).
+                    </p>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbol</th>
+                                    <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Issued Quantity</th>
+                                    <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Market Price (LKR)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @foreach (var symbol in _relatedSymbols)
+                                {
+                                    <tr>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            @symbol.Symbol
+                                            @if (symbol.Symbol == _stock?.Symbol)
+                                            {
+                                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                                    Current
+                                                </span>
+                                            }
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
+                                            @symbol.IssuedQuantity.ToString("N0")
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
+                                            @symbol.MarketPrice.ToTwoDecimalPlaces()
+                                        </td>
+                                    </tr>
+                                }
+                                <tr class="bg-gray-50">
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">Total</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-right text-gray-900">
+                                        @_totalIssuedQuantity.ToString("N0")
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
 
         @if (_showDeleteConfirmation)
         {
