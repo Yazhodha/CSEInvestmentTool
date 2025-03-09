@@ -1,4 +1,5 @@
 using CSEInvestmentTool.Application.Models;
+using CSEInvestmentTool.Domain.Constants;
 using CSEInvestmentTool.Domain.Models;
 using CSEInvestmentTool.Web.Helpers;
 using Microsoft.AspNetCore.Components;
@@ -14,6 +15,13 @@ namespace CSEInvestmentTool.Web.Pages
         private bool _symbolFound = false;
         private List<StockSymbolInfo> _relatedSymbols = new();
         private long _totalIssuedQuantity = 0;
+
+        //private bool _sectorValidated = false;
+        //private bool _equityValidated = false;
+        //private bool _epsValidated = false;
+        //private bool _dividendValidated = false;
+
+        private bool _validationAttempted = false;
 
         // Company search functionality
         private string _companySearchInput = string.Empty;
@@ -40,26 +48,10 @@ namespace CSEInvestmentTool.Web.Pages
 
         // Class for the symbol input
         private string SymbolInputClass =>
-            "flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" +
-            (_selectedCompanyName != string.Empty ? " bg-gray-100" : "");
+            "flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-10" +
+            (_selectedCompanyName != string.Empty ? " bg-gray-100 h-10" : "");
 
-        private readonly List<string> _sectors = new()
-        {
-            "Banks",
-            "Diversified Holdings",
-            "Telecommunications",
-            "Manufacturing",
-            "Hotels & Travel",
-            "Beverage Food & Tobacco",
-            "Insurance",
-            "Construction & Engineering",
-            "Power & Energy",
-            "Healthcare",
-            "Investment Trusts",
-            "Trading",
-            "Transportation",
-            "Plantations"
-        };
+        private List<string> _sectors = SectorConstants.AllSectors;
 
         protected override async Task OnInitializedAsync()
         {
@@ -188,19 +180,16 @@ namespace CSEInvestmentTool.Web.Pages
             // Get available stock types for this company
             _availableStockTypes = await StockCalculationService.GetStockSymbolsForCompanyAsync(company.CompanyName);
 
+            // Reset symbol and selected stock type
+            _stockEntry.Stock.Symbol = string.Empty;
+            _selectedStockType = string.Empty;
+            _symbolFound = false;
+
             // If there's only one stock type, select it automatically
             if (_availableStockTypes.Count == 1)
             {
                 _selectedStockType = _availableStockTypes[0].Symbol;
                 await SelectStockSymbol(_selectedStockType);
-            }
-            else if (_availableStockTypes.Count > 1)
-            {
-                // Multiple stock types, clear symbol until user selects one
-                _stockEntry.Stock.Symbol = string.Empty;
-                _symbolFound = false;
-                _relatedSymbols.Clear();
-                _totalIssuedQuantity = 0;
             }
 
             StateHasChanged();
@@ -233,32 +222,6 @@ namespace CSEInvestmentTool.Web.Pages
                 await FetchStockDataAsync(_currentSymbolInput);
                 StateHasChanged();
             });
-        }
-
-        private async Task OnSymbolInputAsync(ChangeEventArgs e)
-        {
-            // This is only used if the user is not using the company dropdown
-            if (!string.IsNullOrEmpty(_selectedCompanyName))
-            {
-                return; // Don't allow symbol editing if company is selected
-            }
-
-            _symbolFound = false;
-            _relatedSymbols.Clear();
-            _totalIssuedQuantity = 0;
-            _stockEntry.Fundamentals.MarketPrice = 0;
-            _stockEntry.Fundamentals.NAV = 0;
-
-            var symbol = e.Value?.ToString();
-            if (string.IsNullOrWhiteSpace(symbol))
-            {
-                return;
-            }
-
-            // Store current input and restart debounce timer
-            _currentSymbolInput = symbol;
-            _debounceTimer?.Stop();
-            _debounceTimer?.Start();
         }
 
         private async Task FetchStockDataAsync(string symbol)
@@ -299,7 +262,7 @@ namespace CSEInvestmentTool.Web.Pages
                     // If total equity is already provided, calculate NAV
                     if (_stockEntry.Fundamentals.TotalEquity > 0)
                     {
-                        await CalculateNAVAsync();
+                        CalculateNAVAsync();
                     }
                 }
                 else
@@ -330,7 +293,7 @@ namespace CSEInvestmentTool.Web.Pages
             _stockEntry.Fundamentals.TotalLiabilities = DecimalFormatter.ParseShortForm(input);
         }
 
-        private async Task OnEquityInput(ChangeEventArgs e)
+        private void OnEquityInput(ChangeEventArgs e)
         {
             var input = e.Value?.ToString() ?? string.Empty;
             _formattedEquity = input;
@@ -341,11 +304,11 @@ namespace CSEInvestmentTool.Web.Pages
             // If we have the total issued quantity, calculate NAV
             if (_totalIssuedQuantity > 0 && _symbolFound)
             {
-                await CalculateNAVAsync();
+                CalculateNAVAsync();
             }
         }
 
-        private async Task CalculateNAVAsync()
+        private void CalculateNAVAsync()
         {
             if (_stockEntry.Fundamentals.TotalEquity <= 0 || _totalIssuedQuantity <= 0 || !_symbolFound)
             {
@@ -363,6 +326,30 @@ namespace CSEInvestmentTool.Web.Pages
             {
                 Logger.LogError(ex, "Error calculating NAV");
             }
+        }
+
+        // In the ValidateAndSubmit method, update the validation condition:
+        private async Task ValidateAndSubmit()
+        {
+            _validationAttempted = true;
+
+            // Check if all required fields are filled
+            if (string.IsNullOrEmpty(_stockEntry.Stock.CompanyName) ||
+                string.IsNullOrEmpty(_stockEntry.Stock.Symbol) ||
+                string.IsNullOrEmpty(_stockEntry.Stock.Sector) ||
+                _stockEntry.Fundamentals.MarketPrice <= 0 ||
+                _stockEntry.Fundamentals.NAV <= 0 ||
+                _stockEntry.Fundamentals.EPS <= 0 ||
+                _stockEntry.Fundamentals.AnnualDividend < 0 ||
+                _stockEntry.Fundamentals.TotalLiabilities <= 0 ||
+                _stockEntry.Fundamentals.TotalEquity <= 0)
+            {
+                StateHasChanged();
+                return;
+            }
+
+            // If validation passes, call the original submit method
+            await HandleValidSubmit();
         }
 
         private async Task HandleValidSubmit()

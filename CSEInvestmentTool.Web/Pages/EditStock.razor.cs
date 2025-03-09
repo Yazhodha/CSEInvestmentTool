@@ -11,11 +11,12 @@ namespace CSEInvestmentTool.Web.Pages
         [Parameter]
         public int Id { get; set; }
 
-        private StockEntryModel _stockEntry = new();
+        private readonly StockEntryModel _stockEntry = new();
         private Stock? _stock;
         private FundamentalData? _fundamentalData;
         private string? _errorMessage;
         private bool _loading = true;
+        private bool _validationAttempted = false;
 
         // Formatted inputs
         private string _formattedLiabilities = string.Empty;
@@ -24,24 +25,6 @@ namespace CSEInvestmentTool.Web.Pages
         // Related symbols info
         private List<StockSymbolInfo> _relatedSymbols = new();
         private long _totalIssuedQuantity = 0;
-
-        private readonly List<string> _sectors = new()
-        {
-            "Banks",
-            "Diversified Holdings",
-            "Telecommunications",
-            "Manufacturing",
-            "Hotels & Travel",
-            "Beverage Food & Tobacco",
-            "Insurance",
-            "Construction & Engineering",
-            "Power & Energy",
-            "Healthcare",
-            "Investment Trusts",
-            "Trading",
-            "Transportation",
-            "Plantations"
-        };
 
         protected override async Task OnInitializedAsync()
         {
@@ -126,7 +109,7 @@ namespace CSEInvestmentTool.Web.Pages
             _stockEntry.Fundamentals.TotalLiabilities = DecimalFormatter.ParseShortForm(input);
         }
 
-        private async Task OnEquityInput(ChangeEventArgs e)
+        private void OnEquityInput(ChangeEventArgs e)
         {
             var input = e.Value?.ToString() ?? string.Empty;
             _formattedEquity = input;
@@ -135,10 +118,10 @@ namespace CSEInvestmentTool.Web.Pages
             _stockEntry.Fundamentals.TotalEquity = DecimalFormatter.ParseShortForm(input);
 
             // Calculate NAV if we have required values
-            await CalculateNAVAsync();
+            CalculateNAVAsync();
         }
 
-        private async Task CalculateNAVAsync()
+        private void CalculateNAVAsync()
         {
             if (_stockEntry.Fundamentals.TotalEquity <= 0 || _totalIssuedQuantity <= 0)
             {
@@ -155,6 +138,26 @@ namespace CSEInvestmentTool.Web.Pages
             {
                 Logger.LogError(ex, "Error calculating NAV");
             }
+        }
+
+        private async Task ValidateAndSubmit()
+        {
+            _validationAttempted = true;
+
+            // Check if all required fields are filled
+            if (_stockEntry.Fundamentals.MarketPrice <= 0 ||
+                _stockEntry.Fundamentals.NAV <= 0 ||
+                _stockEntry.Fundamentals.EPS <= 0 ||
+                _stockEntry.Fundamentals.AnnualDividend < 0 ||
+                _stockEntry.Fundamentals.TotalLiabilities <= 0 ||
+                _stockEntry.Fundamentals.TotalEquity <= 0)
+            {
+                StateHasChanged();
+                return;
+            }
+
+            // If validation passes, call the original submit method
+            await HandleValidSubmit();
         }
 
         private async Task HandleValidSubmit()
