@@ -25,7 +25,8 @@ public class StockCalculationService : IStockCalculationService
             return 0;
         }
 
-        var nav = totalEquity / totalIssuedQty;
+        // Calculate NAV and round to 2 decimal places
+        var nav = Math.Round(totalEquity / totalIssuedQty, 2, MidpointRounding.AwayFromZero);
         _logger.LogInformation("Calculated NAV for {Symbol}: {NAV} (Total Equity: {TotalEquity}, Total Issued Qty: {TotalIssuedQty})",
             symbol, nav, totalEquity, totalIssuedQty);
 
@@ -86,7 +87,8 @@ public class StockCalculationService : IStockCalculationService
                 return 0;
             }
 
-            return stockData.MarketPrice;
+            // Round to 2 decimal places for consistency
+            return Math.Round(stockData.MarketPrice, 2, MidpointRounding.AwayFromZero);
         }
         catch (Exception ex)
         {
@@ -120,7 +122,7 @@ public class StockCalculationService : IStockCalculationService
             {
                 Symbol = s.Symbol,
                 IssuedQuantity = s.IssuedQuantity,
-                MarketPrice = s.MarketPrice
+                MarketPrice = Math.Round(s.MarketPrice, 2, MidpointRounding.AwayFromZero) // Round for consistency
             }).ToList();
         }
         catch (Exception ex)
@@ -140,7 +142,15 @@ public class StockCalculationService : IStockCalculationService
 
         try
         {
-            return await _cseApiService.GetStockDataBySymbolAsync(symbol);
+            var stockData = await _cseApiService.GetStockDataBySymbolAsync(symbol);
+
+            if (stockData != null)
+            {
+                // Round market price to 2 decimal places for consistency
+                stockData.MarketPrice = Math.Round(stockData.MarketPrice, 2, MidpointRounding.AwayFromZero);
+            }
+
+            return stockData;
         }
         catch (Exception ex)
         {
@@ -148,5 +158,57 @@ public class StockCalculationService : IStockCalculationService
             return null;
         }
     }
-}
 
+    public async Task<List<CompanySearchResult>> GetCompaniesForSearchAsync()
+    {
+        try
+        {
+            return await _cseApiService.GetCompanyListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting companies for search");
+            return new List<CompanySearchResult>();
+        }
+    }
+
+    public async Task<List<CompanySearchResult>> SearchCompaniesByNameAsync(string searchTerm)
+    {
+        try
+        {
+            return await _cseApiService.SearchCompaniesByNameAsync(searchTerm);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching companies by name: {SearchTerm}", searchTerm);
+            return new List<CompanySearchResult>();
+        }
+    }
+
+    public async Task<List<StockSymbolInfo>> GetStockSymbolsForCompanyAsync(string companyName)
+    {
+        if (string.IsNullOrEmpty(companyName))
+        {
+            _logger.LogWarning("Company name cannot be null or empty");
+            return new List<StockSymbolInfo>();
+        }
+
+        try
+        {
+            // Get all stocks for the company
+            var companyStocks = await _cseApiService.GetAllStocksByCompanyNameAsync(companyName);
+
+            return companyStocks.Select(s => new StockSymbolInfo
+            {
+                Symbol = s.Symbol,
+                IssuedQuantity = s.IssuedQuantity,
+                MarketPrice = Math.Round(s.MarketPrice, 2, MidpointRounding.AwayFromZero) // Round for consistency
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting stock symbols for company: {CompanyName}", companyName);
+            return new List<StockSymbolInfo>();
+        }
+    }
+}

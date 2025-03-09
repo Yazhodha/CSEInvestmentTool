@@ -24,4 +24,17 @@ public interface ICSEApiService
     /// <param name="companyName">The company name to search for</param>
     /// <returns>List of stock market data for the company</returns>
     Task<List<StockMarketData>> GetAllStocksByCompanyNameAsync(string companyName);
+
+    /// <summary>
+    /// Gets a list of all companies with their available stock symbols
+    /// </summary>
+    /// <returns>List of companies with their stock symbols</returns>
+    Task<List<CompanySearchResult>> GetCompanyListAsync();
+
+    /// <summary>
+    /// Searches for companies by name (partial match)
+    /// </summary>
+    /// <param name="searchTerm">The company name search term</param>
+    /// <returns>List of matching companies with their stock symbols</returns>
+    Task<List<CompanySearchResult>> SearchCompaniesByNameAsync(string searchTerm);
 }

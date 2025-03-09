@@ -40,19 +40,84 @@
             <div class="space-y-6 p-6 bg-gray-50 rounded-lg">
                 <h3 class="text-lg font-semibold">Stock Information</h3>
 
+                <!-- Company Search Dropdown -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Company Name</label>
+                    <div class="relative mt-1">
+                        <div class="flex">
+                            <input type="text"
+                                   placeholder="Search for a company..."
+                                   @onfocus="ShowCompanyDropdown"
+                                   @onblur="DelayedHideCompanyDropdown"
+                                   @oninput="HandleCompanySearchInput"
+                                   value="@_companySearchInput"
+                                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            @if (_loadingCompanies)
+                            {
+                                <div class="absolute inset-y-0 right-3 flex items-center">
+                                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+                                </div>
+                            }
+                        </div>
+
+                        @if (_showCompanyDropdown && _filteredCompanies.Any())
+                        {
+                            <div class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 overflow-auto">
+                                @foreach (var company in _filteredCompanies)
+                                {
+                                    <div class="cursor-pointer px-4 py-2 hover:bg-gray-100" @onmousedown="() => SelectCompany(company)">
+                                        <div class="text-sm">@company.CompanyName</div>
+                                        @if (company.HasMultipleStocks)
+                                        {
+                                            <div class="text-xs text-gray-500">
+                                                Multiple stock types available
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_selectedCompanyName))
+                    {
+                        <div class="mt-1 text-xs text-green-600">
+                            Selected: @_selectedCompanyName
+                        </div>
+                    }
+                </div>
+
+                <!-- Stock Type Dropdown (Only shown if company has multiple stock types) -->
+                @if (_availableStockTypes.Count > 1)
+                {
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Stock Type</label>
+                        <select value="@_selectedStockType"
+                                @onchange="async (e) => {
+                                    _selectedStockType = e.Value?.ToString() ?? string.Empty;
+                                    await HandleStockTypeChange(e);
+                                }"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">Select a stock type</option>
+                            @foreach (var stockType in _availableStockTypes)
+                            {
+                                <option value="@stockType.Symbol">@stockType.Symbol</option>
+                            }
+                        </select>
+                        <div class="mt-1 text-xs text-indigo-600">
+                            This company has multiple stock types. Please select one.
+                        </div>
+                    </div>
+                }
+
+                <!-- Symbol (read-only once company is selected) -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Symbol</label>
                     <div class="flex mt-1">
                         <InputText @bind-Value="_stockEntry.Stock.Symbol"
-                                   @oninput="OnSymbolInputAsync"
-                                   class="flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                        @if (_loadingSymbol)
-                        {
-                            <div class="ml-2 flex items-center">
-                                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
-                            </div>
-                        }
-                        else if (_symbolFound)
+                                   readonly="@(_selectedCompanyName != string.Empty)"
+                                   class="@SymbolInputClass" />
+                        @if (_symbolFound)
                         {
                             <div class="ml-2 flex items-center">
                                 <svg class="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -62,19 +127,6 @@
                         }
                     </div>
                     <ValidationMessage For="@(() => _stockEntry.Stock.Symbol)" class="text-red-500 text-sm" />
-                    @if (_symbolFound && _relatedSymbols.Count > 1)
-                    {
-                        <div class="mt-1 text-xs text-indigo-600">
-                            Company has multiple stock types. All will be considered for NAV calculation.
-                        </div>
-                    }
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Company Name</label>
-                    <InputText @bind-Value="_stockEntry.Stock.CompanyName"
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                    <ValidationMessage For="@(() => _stockEntry.Stock.CompanyName)" class="text-red-500 text-sm" />
                 </div>
 
                 <div>
@@ -206,7 +258,15 @@
                             @foreach (var relatedSymbol in _relatedSymbols)
                             {
                                 <tr class="bg-indigo-50">
-                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-indigo-800">@relatedSymbol.Symbol</td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-indigo-800">
+                                        @relatedSymbol.Symbol
+                                        @if (relatedSymbol.Symbol == _stockEntry.Stock.Symbol)
+                                        {
+                                            <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                                Selected
+                                            </span>
+                                        }
+                                    </td>
                                     <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-800">@relatedSymbol.IssuedQuantity.ToString("N0")</td>
                                     <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-indigo-800">@relatedSymbol.MarketPrice.ToTwoDecimalPlaces()</td>
                                 </tr>

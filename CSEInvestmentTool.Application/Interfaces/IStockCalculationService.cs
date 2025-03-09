@@ -28,4 +28,19 @@ public interface IStockCalculationService
     /// Gets detailed stock information for a given symbol.
     /// </summary>
     Task<StockMarketData?> GetStockDataBySymbolAsync(string symbol);
+
+    /// <summary>
+    /// Gets a list of all companies for the company search dropdown
+    /// </summary>
+    Task<List<CompanySearchResult>> GetCompaniesForSearchAsync();
+
+    /// <summary>
+    /// Searches for companies by name (partial match)
+    /// </summary>
+    Task<List<CompanySearchResult>> SearchCompaniesByNameAsync(string searchTerm);
+
+    /// <summary>
+    /// Gets stock information for a specific company
+    /// </summary>
+    Task<List<StockSymbolInfo>> GetStockSymbolsForCompanyAsync(string companyName);
 }

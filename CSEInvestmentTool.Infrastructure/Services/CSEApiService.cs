@@ -14,6 +14,7 @@ public class CSEApiService : ICSEApiService
     private readonly ILogger<CSEApiService> _logger;
     private readonly IMemoryCache _cache;
     private const string CACHE_KEY = "CSE_STOCKS_DATA";
+    private const string COMPANIES_CACHE_KEY = "CSE_COMPANIES_LIST";
     private const int CACHE_DURATION_MINUTES = 30;
     private const string CSE_API_URL = "https://www.cse.lk/api/list_by_market_cap";
 
@@ -113,5 +114,74 @@ public class CSEApiService : ICSEApiService
         return allStocks
             .Where(s => s.CompanyName.Equals(companyName, StringComparison.OrdinalIgnoreCase))
             .ToList();
+    }
+
+    public async Task<List<CompanySearchResult>> GetCompanyListAsync()
+    {
+        // Try to get from cache first
+        if (_cache.TryGetValue(COMPANIES_CACHE_KEY, out List<CompanySearchResult>? cachedCompanies) && cachedCompanies != null)
+        {
+            _logger.LogInformation("Retrieved {Count} companies from cache", cachedCompanies.Count);
+            return cachedCompanies;
+        }
+
+        try
+        {
+            var allStocks = await GetAllStocksDataAsync();
+
+            // Group by company name to identify companies with multiple stock types
+            var companies = allStocks
+                .GroupBy(s => s.CompanyName)
+                .Select(g => new CompanySearchResult
+                {
+                    CompanyName = g.Key,
+                    Symbols = g.Select(s => s.Symbol).ToList()
+                })
+                .OrderBy(c => c.CompanyName)
+                .ToList();
+
+            _logger.LogInformation("Created company list with {Count} companies", companies.Count);
+
+            // Cache the result
+            _cache.Set(COMPANIES_CACHE_KEY, companies, TimeSpan.FromMinutes(CACHE_DURATION_MINUTES));
+
+            return companies;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create company list");
+            return new List<CompanySearchResult>();
+        }
+    }
+
+    public async Task<List<CompanySearchResult>> SearchCompaniesByNameAsync(string searchTerm)
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            _logger.LogInformation("Empty search term, returning top companies");
+            var allCompanies = await GetCompanyListAsync();
+            return allCompanies.Take(10).ToList(); // Return top 10 companies for empty search
+        }
+
+        try
+        {
+            var allCompanies = await GetCompanyListAsync();
+
+            // Search for companies containing the search term (case insensitive)
+            var matchingCompanies = allCompanies
+                .Where(c => c.CompanyName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(c => c.CompanyName)
+                .ToList();
+
+            _logger.LogInformation("Found {Count} companies matching search term: {SearchTerm}",
+                matchingCompanies.Count, searchTerm);
+
+            return matchingCompanies;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to search companies by name: {SearchTerm}", searchTerm);
+            return new List<CompanySearchResult>();
+        }
     }
 }
