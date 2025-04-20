@@ -15,6 +15,8 @@ namespace CSEInvestmentTool.Web.Pages
         private decimal _newMonthlyAmount = 50000m;
         private bool _showBudgetModal = false;
         private string? _budgetErrorMessage;
+        private string _selectedSector = "";
+        private List<string> _sectors = new();
 
         protected override async Task OnInitializedAsync()
         {
@@ -34,41 +36,22 @@ namespace CSEInvestmentTool.Web.Pages
                 // Get latest scores
                 _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
 
-                // Calculate fresh recommendations based on current scores
-                if (_scores.Any())
-                {
-                    var recommendations = await AllocationService.CalculateInvestmentAllocationsAsync(
-                        _scores,
-                        DateTime.UtcNow.Date,
-                        _monthlyInvestmentAmount);
+                // Get unique sectors
+                _sectors = _scores
+                    .Where(s => s.Stock != null)
+                    .Select(s => s.Stock!.Sector)
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .Distinct()
+                    .OrderBy(s => s)
+                    .ToList();
 
-                    // Save each recommendation
-                    foreach (var recommendation in recommendations)
-                    {
-                        try
-                        {
-                            await RecommendationRepository.AddRecommendationAsync(recommendation);
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.LogWarning(ex, "Error saving recommendation for stock {StockId}", recommendation.StockId);
-                            // Continue with other recommendations even if one fails
-                        }
-                    }
-
-                    // Get the latest recommendations after saving
-                    _recommendations = (await RecommendationRepository.GetLatestRecommendationsAsync()).ToList();
-                }
-                else
-                {
-                    _recommendations = new List<InvestmentRecommendation>();
-                }
+                // Get latest recommendations
+                _recommendations = (await RecommendationRepository.GetLatestRecommendationsAsync()).ToList();
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Error loading recommendations");
-                // Even if there's an error, try to get existing recommendations
-                _recommendations = (await RecommendationRepository.GetLatestRecommendationsAsync()).ToList();
+                _recommendations = new List<InvestmentRecommendation>();
             }
             finally
             {
@@ -85,7 +68,7 @@ namespace CSEInvestmentTool.Web.Pages
                 // Get latest scores
                 _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
 
-                // Calculate fresh recommendations based on current scores
+                // Calculate fresh recommendations
                 if (_scores.Any())
                 {
                     var recommendations = await AllocationService.CalculateInvestmentAllocationsAsync(
@@ -103,21 +86,12 @@ namespace CSEInvestmentTool.Web.Pages
                         catch (Exception ex)
                         {
                             Logger.LogWarning(ex, "Error saving recommendation for stock {StockId}", recommendation.StockId);
-                            // Continue with other recommendations even if one fails
                         }
                     }
 
                     // Get the latest recommendations after saving
                     _recommendations = (await RecommendationRepository.GetLatestRecommendationsAsync()).ToList();
                 }
-                else
-                {
-                    _recommendations = new List<InvestmentRecommendation>();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error generating recommendations");
             }
             finally
             {
@@ -152,18 +126,12 @@ namespace CSEInvestmentTool.Web.Pages
                     return;
                 }
 
-                // Update in database
                 var result = await AllocationService.UpdateMonthlyInvestmentAmountAsync(_newMonthlyAmount);
 
                 if (result)
                 {
-                    // Update local value too
                     _monthlyInvestmentAmount = _newMonthlyAmount;
-
-                    // Close the modal
                     _showBudgetModal = false;
-
-                    // Regenerate recommendations with the new budget
                     await GenerateRecommendations();
                 }
                 else
@@ -176,6 +144,28 @@ namespace CSEInvestmentTool.Web.Pages
                 Logger.LogError(ex, "Error updating monthly investment budget");
                 _budgetErrorMessage = "An error occurred while updating the budget.";
             }
+        }
+
+        private async Task ShowAllSectors()
+        {
+            _selectedSector = "";
+            await LoadData();
+        }
+
+        private decimal GetAverageScore()
+        {
+            var filteredScores = string.IsNullOrEmpty(_selectedSector)
+                ? _scores
+                : _scores.Where(s => s.Stock?.Sector == _selectedSector);
+
+            return filteredScores.Any() ? filteredScores.Average(s => s.TotalScore) : 0;
+        }
+
+        private int GetFilteredRecommendationsCount()
+        {
+            return string.IsNullOrEmpty(_selectedSector)
+                ? _recommendations.Count
+                : _recommendations.Count(r => r.Stock?.Sector == _selectedSector);
         }
     }
 }
