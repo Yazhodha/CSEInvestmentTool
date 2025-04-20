@@ -3,6 +3,7 @@
 @using CSEInvestmentTool.Application.Services
 @using CSEInvestmentTool.Application.Interfaces
 @using CSEInvestmentTool.Web.Helpers
+@using System.Threading.Tasks
 @inject ILogger<Index> Logger
 @inject IStockScoreRepository ScoreRepository
 @inject IInvestmentAllocationService AllocationService
@@ -10,11 +11,27 @@
 @inject NavigationManager Navigation
 
 <div class="space-y-6">
-    <button @onclick="GenerateRecommendations"
-            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-        <span class="mr-2">↻</span>
-        Refresh Dashboard
-    </button>
+    <div class="sm:flex sm:items-center sm:justify-between">
+        <div>
+            <button @onclick="GenerateRecommendations"
+                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <span class="mr-2">↻</span>
+                Refresh Dashboard
+            </button>
+        </div>
+        <div>
+            <label class="text-sm font-medium text-gray-700">Filter by Sector:</label>
+            <select @bind="_selectedSector" @bind:after="LoadData"
+                    class="ml-2 block w-64 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                <option value="">All Sectors</option>
+                @foreach (var sector in _sectors)
+                {
+                    <option value="@sector">@sector</option>
+                }
+            </select>
+        </div>
+    </div>
+
     @if (_loading)
     {
         <div class="flex justify-center items-center h-32">
@@ -47,9 +64,15 @@
             <div class="bg-green-50 rounded-lg p-6 shadow-sm">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Average Score</p>
+                        <p class="text-sm text-gray-500">
+                            Average Score
+                            @if (!string.IsNullOrEmpty(_selectedSector))
+                            {
+                                <span class="text-xs text-gray-400">(@_selectedSector)</span>
+                            }
+                        </p>
                         <p class="text-2xl font-bold text-green-700 mt-1">
-                            @(_scores.Any() ? (_scores.Average(s => s.TotalScore)).ToTwoDecimalPlaces() : "N/A")
+                            @GetAverageScore().ToTwoDecimalPlaces()
                         </p>
                     </div>
                     <div class="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
@@ -61,9 +84,15 @@
             <div class="bg-purple-50 rounded-lg p-6 shadow-sm">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Recommended Stocks</p>
+                        <p class="text-sm text-gray-500">
+                            Recommended Stocks
+                            @if (!string.IsNullOrEmpty(_selectedSector))
+                            {
+                                <span class="text-xs text-gray-400">(@_selectedSector)</span>
+                            }
+                        </p>
                         <p class="text-2xl font-bold text-purple-700 mt-1">
-                            @(_recommendations?.Count ?? 0)
+                            @GetFilteredRecommendationsCount()
                         </p>
                     </div>
                     <div class="h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center">
@@ -75,55 +104,87 @@
 
         @if (_recommendations?.Any() == true)
         {
-            <div class="bg-white rounded-lg shadow">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h2 class="text-lg font-medium text-gray-900">Investment Recommendations</h2>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Allocation</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @foreach (var recommendation in _recommendations)
+            var displayRecommendations = string.IsNullOrEmpty(_selectedSector) 
+                ? _recommendations 
+                : _recommendations.Where(r => r.Stock?.Sector == _selectedSector).ToList();
+
+            @if (displayRecommendations.Any())
+            {
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-medium text-gray-900">
+                            Investment Recommendations
+                            @if (!string.IsNullOrEmpty(_selectedSector))
                             {
-                                <tr class="hover:bg-gray-50 cursor-pointer" @onclick="() => NavigateToStockDetails(recommendation.StockId)">
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center">
-                                            <div>
-                                                <div class="text-sm font-medium text-gray-900">@recommendation.Stock?.Symbol</div>
-                                                <div class="text-sm text-gray-500">@recommendation.Stock?.CompanyName</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900">
-                                            @{
-                                                var score = _scores.FirstOrDefault(s => s.StockId == recommendation.StockId);
-                                                @(score?.TotalScore.ToTwoDecimalPlaces() ?? "N/A")
-                                            }
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900">
-                                            LKR @recommendation.RecommendedAmount.ToShortForm()
-                                            <span class="text-xs text-gray-500">(@recommendation.RecommendedAmount.ToString("N0"))</span>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <div class="text-sm text-gray-900">@recommendation.RecommendationReason</div>
-                                    </td>
-                                </tr>
+                                <span class="text-sm font-normal text-gray-500 ml-2">(@_selectedSector)</span>
                             }
-                        </tbody>
-                    </table>
+                        </h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Allocation</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @foreach (var recommendation in displayRecommendations)
+                                {
+                                    <tr class="hover:bg-gray-50 cursor-pointer" @onclick="() => NavigateToStockDetails(recommendation.StockId)">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div>
+                                                    <div class="text-sm font-medium text-gray-900">@recommendation.Stock?.Symbol</div>
+                                                    <div class="text-sm text-gray-500">@recommendation.Stock?.CompanyName</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900">
+                                                @{
+                                                    var score = _scores.FirstOrDefault(s => s.StockId == recommendation.StockId);
+                                                    @(score?.TotalScore.ToTwoDecimalPlaces() ?? "N/A")
+                                                }
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900">
+                                                LKR @recommendation.RecommendedAmount.ToShortForm()
+                                                <span class="text-xs text-gray-500">(@recommendation.RecommendedAmount.ToString("N0"))</span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm text-gray-900">@recommendation.RecommendationReason</div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+            }
+            else
+            {
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                    <div class="flex">
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                No recommendations available for the selected sector.
+                                @if (!string.IsNullOrEmpty(_selectedSector))
+                                {
+                                    <button @onclick="ShowAllSectors"
+                                            class="text-blue-600 hover:text-blue-800 underline focus:outline-none ml-1">
+                                        Show all sectors
+                                    </button>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            }
         }
         else
         {

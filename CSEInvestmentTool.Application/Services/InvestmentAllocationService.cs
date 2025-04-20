@@ -104,20 +104,22 @@ public class InvestmentAllocationService : IInvestmentAllocationService
                 return recommendations;
             }
 
-            // Take top ranked stocks
+            // Sort by score in descending order and take top ranked stocks
             var topStocks = activeStocks
                 .OrderByDescending(s => s.TotalScore)
                 .Take(_maxStocks)
                 .ToList();
 
-            _logger.LogInformation("Selected top {Count} active stocks for investment", topStocks.Count);
-
-            // Calculate allocation based on scores
+            // Calculate total score for proportional allocation
             decimal totalScore = topStocks.Sum(s => s.TotalScore);
             decimal remainingAmount = investmentAmount;
 
+            // Generate recommendations for each stock
             foreach (var stock in topStocks)
             {
+                if (remainingAmount <= 0)
+                    break;
+
                 var recommendation = CalculateStockAllocation(stock, totalScore, investmentAmount, ref remainingAmount, recommendationDate);
                 recommendations.Add(recommendation);
 
@@ -125,12 +127,25 @@ public class InvestmentAllocationService : IInvestmentAllocationService
                     recommendation.RecommendedAmount, stock.StockId, remainingAmount);
             }
 
-            // Distribute any remaining amount
+            // Distribute any remaining amount proportionally among existing recommendations
             if (remainingAmount > 0 && recommendations.Any())
             {
-                recommendations[0].RecommendedAmount += remainingAmount;
-                _logger.LogInformation("Distributed remaining amount {Amount:C} to top stock",
-                    remainingAmount);
+                decimal totalCurrentAllocation = recommendations.Sum(r => r.RecommendedAmount);
+                foreach (var recommendation in recommendations)
+                {
+                    decimal proportion = recommendation.RecommendedAmount / totalCurrentAllocation;
+                    decimal additionalAmount = Math.Round(remainingAmount * proportion, 0, MidpointRounding.AwayFromZero);
+                    recommendation.RecommendedAmount += additionalAmount;
+                    remainingAmount -= additionalAmount;
+                }
+
+                // Add any leftover cents to the first recommendation
+                if (remainingAmount > 0)
+                {
+                    recommendations[0].RecommendedAmount += remainingAmount;
+                }
+
+                _logger.LogInformation("Distributed remaining amount proportionally among recommendations");
             }
 
             return recommendations;
