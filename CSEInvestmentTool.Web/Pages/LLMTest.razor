@@ -1,0 +1,296 @@
+﻿@page "/llm-test"
+@using CSEInvestmentTool.Application.Interfaces
+@using CSEInvestmentTool.Application.Models.LLM
+@inject ILogger<LLMTest> Logger
+@inject ILLMInvestmentService? LLMInvestmentService
+@inject ILLMProviderFactory? LLMProviderFactory
+@inject IConfiguration Configuration
+
+<h3>LLM Service Debug Page</h3>
+
+<div class="space-y-4">
+    @if (_loading)
+    {
+        <div class="bg-blue-50 p-4 rounded border">
+            <p>🔍 Testing LLM services...</p>
+        </div>
+    }
+    else
+    {
+        <div class="bg-white p-4 rounded border">
+            <h4 class="font-bold mb-2">Service Registration:</h4>
+            <ul class="space-y-1">
+                <li>LLMInvestmentService: @(LLMInvestmentService != null ? "✅ Registered" : "❌ Not Registered")</li>
+                <li>LLMProviderFactory: @(LLMProviderFactory != null ? "✅ Registered" : "❌ Not Registered")</li>
+            </ul>
+        </div>
+
+        <div class="bg-white p-4 rounded border">
+            <h4 class="font-bold mb-2">Configuration:</h4>
+            <ul class="space-y-1">
+                <li>Deepseek API Key: @(_hasApiKey ? "✅ Configured" : "❌ Missing")</li>
+                <li>Default Provider: @_defaultProvider</li>
+                <li>Deepseek Endpoint: @_deepseekEndpoint</li>
+                <li>Deepseek Model: @_deepseekModel</li>
+            </ul>
+        </div>
+
+        @if (_logs.Any())
+        {
+            <div class="bg-gray-50 p-4 rounded border">
+                <h4 class="font-bold mb-2">Detailed Logs:</h4>
+                <div class="text-sm space-y-1 max-h-60 overflow-y-auto">
+                    @foreach (var log in _logs)
+                    {
+                        <div class="@GetLogClass(log)">@log</div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (_testResults.Any())
+        {
+            <div class="bg-white p-4 rounded border">
+                <h4 class="font-bold mb-2">Test Results:</h4>
+                <ul class="space-y-1">
+                    @foreach (var result in _testResults)
+                    {
+                        <li class="@(result.StartsWith("✅") ? "text-green-600" : "text-red-600")">@result</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="bg-red-50 p-4 rounded border border-red-200">
+                <h4 class="font-bold text-red-800">Error:</h4>
+                <p class="text-red-600">@_errorMessage</p>
+            </div>
+        }
+
+        <div class="flex space-x-4">
+            <button @onclick="RunBasicTests" disabled="_testing"
+                    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+                @(_testing ? "Testing..." : "Run Basic Tests")
+            </button>
+
+            <button @onclick="RunFullLLMTest"
+                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
+                @(_testing ? "Testing..." : "Test Actual LLM Call")
+            </button>
+
+            <button @onclick="ClearLogs"
+                    class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
+                Clear Logs
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _testing = false;
+    private bool _hasApiKey = false;
+    private string _defaultProvider = "Unknown";
+    private string _deepseekEndpoint = "Unknown";
+    private string _deepseekModel = "Unknown";
+    private string? _errorMessage;
+    private List<string> _testResults = new();
+    private List<string> _logs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        AddLog("🚀 Initializing LLM Test Page...");
+
+        try
+        {
+            // Check configuration
+            var apiKey = Configuration["LLM:Providers:Deepseek:ApiKey"];
+            _hasApiKey = !string.IsNullOrEmpty(apiKey) && apiKey != "your-deepseek-api-key-here";
+            AddLog($"API Key check: {(_hasApiKey ? "✅ Found" : "❌ Missing or placeholder")}");
+
+            _defaultProvider = Configuration["LLM:DefaultProvider"] ?? "Not Set";
+            _deepseekEndpoint = Configuration["LLM:Providers:Deepseek:ApiEndpoint"] ?? "Not Set";
+            _deepseekModel = Configuration["LLM:Providers:Deepseek:Model"] ?? "Not Set";
+
+            AddLog($"Configuration loaded: Provider={_defaultProvider}, Model={_deepseekModel}");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error checking configuration: {ex.Message}";
+            AddLog($"❌ Configuration error: {ex.Message}");
+            Logger.LogError(ex, "Error in LLM test page initialization");
+        }
+        finally
+        {
+            _loading = false;
+            AddLog("✅ Initialization complete");
+        }
+    }
+
+    private async Task RunBasicTests()
+    {
+        AddLog("🔍 Starting basic tests...");
+        _testing = true;
+        _testResults.Clear();
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Delay(100); // Small delay to ensure UI updates
+
+            // Test 1: Service availability
+            AddLog("Test 1: Checking LLMInvestmentService...");
+            if (LLMInvestmentService == null)
+            {
+                _testResults.Add("❌ LLMInvestmentService is not registered");
+                AddLog("❌ LLMInvestmentService is null");
+                return;
+            }
+            _testResults.Add("✅ LLMInvestmentService is available");
+            AddLog("✅ LLMInvestmentService found");
+
+            // Test 2: Provider factory
+            AddLog("Test 2: Checking LLMProviderFactory...");
+            if (LLMProviderFactory == null)
+            {
+                _testResults.Add("❌ LLMProviderFactory is not registered");
+                AddLog("❌ LLMProviderFactory is null");
+                return;
+            }
+            _testResults.Add("✅ LLMProviderFactory is available");
+            AddLog("✅ LLMProviderFactory found");
+
+            // Test 3: Get philosophies
+            AddLog("Test 3: Getting investment philosophies...");
+            try
+            {
+                var philosophies = await LLMInvestmentService.GetAvailablePhilosophiesAsync();
+                _testResults.Add($"✅ Retrieved {philosophies.Count} investment philosophies");
+                AddLog($"✅ Found {philosophies.Count} philosophies: {string.Join(", ", philosophies.Select(p => p.Name))}");
+            }
+            catch (Exception ex)
+            {
+                _testResults.Add($"❌ Failed to get philosophies: {ex.Message}");
+                AddLog($"❌ Philosophy error: {ex.Message}");
+            }
+
+            // Test 4: Get default provider
+            AddLog("Test 4: Getting default provider...");
+            try
+            {
+                var provider = LLMProviderFactory.GetDefaultProvider();
+                _testResults.Add($"✅ Default provider: {provider.ProviderName} - {provider.Model}");
+                AddLog($"✅ Provider: {provider.ProviderName}, Model: {provider.Model}");
+
+                // Test 5: Provider availability
+                AddLog("Test 5: Checking provider availability...");
+                var isAvailable = await provider.IsAvailableAsync();
+                _testResults.Add(isAvailable ? "✅ Provider is available" : "❌ Provider is not available");
+                AddLog(isAvailable ? "✅ Provider availability check passed" : "❌ Provider availability check failed");
+            }
+            catch (Exception ex)
+            {
+                _testResults.Add($"❌ Failed to get provider: {ex.Message}");
+                AddLog($"❌ Provider error: {ex.Message}");
+            }
+
+            AddLog("🎉 Basic tests completed!");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Test failed: {ex.Message}";
+            AddLog($"💥 Test exception: {ex.Message}");
+            Logger.LogError(ex, "Error running LLM tests");
+        }
+        finally
+        {
+            _testing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunFullLLMTest()
+    {
+        AddLog("🤖 Starting full LLM test with actual API call...");
+        _testing = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            if (LLMProviderFactory == null)
+            {
+                AddLog("❌ LLMProviderFactory not available");
+                return;
+            }
+
+            AddLog("Getting default provider...");
+            var provider = LLMProviderFactory.GetDefaultProvider();
+            AddLog($"Provider: {provider.ProviderName}");
+
+            AddLog("Creating simple test request...");
+            var testRequest = new LLMRequest
+                {
+                    SystemPrompt = "You are a helpful assistant.",
+                    UserPrompt = "Say 'Hello from Deepseek!' if you can respond.",
+                    Temperature = 0.1m,
+                    MaxTokens = 50
+                };
+
+            AddLog("Sending request to LLM...");
+            var response = await provider.CompleteChatAsync(testRequest);
+
+            if (response.Success)
+            {
+                AddLog($"✅ LLM Response Success!");
+                AddLog($"Response: {response.Content}");
+                AddLog($"Tokens used: {response.TokensUsed}");
+                AddLog($"Model: {response.Model}");
+                _testResults.Add("✅ Full LLM test successful!");
+            }
+            else
+            {
+                AddLog($"❌ LLM Response Failed: {response.ErrorMessage}");
+                _testResults.Add($"❌ LLM test failed: {response.ErrorMessage}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Full LLM test failed: {ex.Message}";
+            AddLog($"💥 Full LLM test exception: {ex.Message}");
+            Logger.LogError(ex, "Error in full LLM test");
+        }
+        finally
+        {
+            _testing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearLogs()
+    {
+        _logs.Clear();
+        _testResults.Clear();
+        _errorMessage = null;
+        StateHasChanged();
+    }
+
+    private void AddLog(string message)
+    {
+        var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+        _logs.Add($"[{timestamp}] {message}");
+        Logger.LogInformation("LLM Test: {Message}", message);
+        StateHasChanged();
+    }
+
+    private string GetLogClass(string log)
+    {
+        if (log.Contains("❌") || log.Contains("💥")) return "text-red-600";
+        if (log.Contains("✅") || log.Contains("🎉")) return "text-green-600";
+        if (log.Contains("🔍") || log.Contains("🤖")) return "text-blue-600";
+        return "text-gray-700";
+    }
+}

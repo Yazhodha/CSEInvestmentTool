@@ -15,6 +15,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<StockScore> StockScores { get; set; }
     public DbSet<InvestmentRecommendation> InvestmentRecommendations { get; set; }
     public DbSet<AppSetting> AppSettings { get; set; }
+    public DbSet<InvestmentPhilosophy> InvestmentPhilosophies { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -39,6 +40,10 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<AppSetting>()
             .HasIndex(s => s.Key)
+            .IsUnique();
+
+        modelBuilder.Entity<InvestmentPhilosophy>()
+            .HasIndex(p => p.Name)
             .IsUnique();
     }
 }

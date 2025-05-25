@@ -2,7 +2,9 @@
 @using CSEInvestmentTool.Domain.Models
 @using CSEInvestmentTool.Application.Services
 @using CSEInvestmentTool.Application.Interfaces
+@using CSEInvestmentTool.Application.Models
 @using CSEInvestmentTool.Web.Helpers
+@using CSEInvestmentTool.Domain.Constants
 @using System.Threading.Tasks
 @inject ILogger<Index> Logger
 @inject IStockScoreRepository ScoreRepository
@@ -13,29 +15,94 @@
 <div class="space-y-6">
     <div class="sm:flex sm:items-center sm:justify-between">
         <div>
-            <button @onclick="GenerateRecommendations"
-                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                <span class="mr-2">↻</span>
-                Refresh Dashboard
+            <h1 class="text-2xl font-bold text-gray-900">Investment Dashboard</h1>
+            <p class="mt-1 text-sm text-gray-500">Generate investment recommendations using Algorithm or AI</p>
+        </div>
+        <div class="flex items-center space-x-4">
+            <!-- Method Selection -->
+            <div class="flex items-center space-x-2">
+                <label class="text-sm font-medium text-gray-700">Method:</label>
+                <select @bind="_selectedMethodString" @bind:after="OnMethodChanged"
+                        class="block w-32 pl-3 pr-8 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                    <option value="Algorithm">Algorithm</option>
+                    <option value="AI">AI Analysis</option>
+                </select>
+            </div>
+
+            <!-- AI Philosophy (only shown when AI is selected) -->
+            @if (_selectedMethodString == "AI")
+            {
+                <div class="flex items-center space-x-2">
+                    <label class="text-sm font-medium text-gray-700">Philosophy:</label>
+                    <select @bind="_selectedPhilosophy"
+                            class="block w-40 pl-3 pr-8 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                        <option value="@InvestmentPhilosophyType.ValueInvesting">Value Investing</option>
+                        <option value="@InvestmentPhilosophyType.GrowthInvesting">Growth Investing</option>
+                        <option value="@InvestmentPhilosophyType.DividendInvesting">Dividend Focus</option>
+                        <option value="@InvestmentPhilosophyType.BalancedApproach">Balanced</option>
+                        <option value="@InvestmentPhilosophyType.Conservative">Conservative</option>
+                    </select>
+                </div>
+            }
+
+            <button @onclick="GenerateRecommendations" disabled="_loading"
+                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
+                @if (_loading)
+                {
+                    <span class="mr-2">⏳</span>
+                    <span>@(_selectedMethodString == "AI" ? "AI Analyzing..." : "Calculating...")</span>
+                }
+                else
+                {
+                    <span class="mr-2">@(_selectedMethodString == "AI" ? "🤖" : "📊")</span>
+                    <span>Generate @(_selectedMethodString == "AI" ? "AI" : "Algorithm") Recommendations</span>
+                }
             </button>
         </div>
-        <div>
-            <label class="text-sm font-medium text-gray-700">Filter by Sector:</label>
-            <select @bind="_selectedSector" @bind:after="LoadData"
-                    class="ml-2 block w-64 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                <option value="">All Sectors</option>
-                @foreach (var sector in _sectors)
-                {
-                    <option value="@sector">@sector</option>
-                }
-            </select>
-        </div>
     </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">Error</h3>
+                    <p class="text-sm text-red-700 mt-1">@_errorMessage</p>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_successMessage))
+    {
+        <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-green-700">@_successMessage</p>
+                </div>
+            </div>
+        </div>
+    }
 
     @if (_loading)
     {
         <div class="flex justify-center items-center h-32">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                <p class="mt-2 text-sm text-gray-600">
+                    @(_selectedMethodString == "AI" ? "AI is analyzing your stocks..." : "Calculating algorithm scores...")
+                </p>
+            </div>
         </div>
     }
     else
@@ -64,19 +131,14 @@
             <div class="bg-green-50 rounded-lg p-6 shadow-sm">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">
-                            Average Score
-                            @if (!string.IsNullOrEmpty(_selectedSector))
-                            {
-                                <span class="text-xs text-gray-400">(@_selectedSector)</span>
-                            }
+                        <p class="text-sm text-gray-500">Recommendation Method</p>
+                        <p class="text-xl font-bold text-green-700 mt-1">
+                            @(_selectedMethodString == "AI" ? "🤖 AI Analysis" : "📊 Algorithm")
                         </p>
-                        <p class="text-2xl font-bold text-green-700 mt-1">
-                            @GetAverageScore().ToTwoDecimalPlaces()
-                        </p>
-                    </div>
-                    <div class="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <span class="text-green-600">%</span>
+                        @if (_selectedMethodString == "AI")
+                        {
+                            <p class="text-xs text-green-600">@_selectedPhilosophy.ToString().Replace("Investing", "")</p>
+                        }
                     </div>
                 </div>
             </div>
@@ -84,19 +146,10 @@
             <div class="bg-purple-50 rounded-lg p-6 shadow-sm">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">
-                            Recommended Stocks
-                            @if (!string.IsNullOrEmpty(_selectedSector))
-                            {
-                                <span class="text-xs text-gray-400">(@_selectedSector)</span>
-                            }
-                        </p>
+                        <p class="text-sm text-gray-500">Recommended Stocks</p>
                         <p class="text-2xl font-bold text-purple-700 mt-1">
-                            @GetFilteredRecommendationsCount()
+                            @_recommendations.Count
                         </p>
-                    </div>
-                    <div class="h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center">
-                        <span class="text-purple-600">#</span>
                     </div>
                 </div>
             </div>
@@ -104,87 +157,64 @@
 
         @if (_recommendations?.Any() == true)
         {
-            var displayRecommendations = string.IsNullOrEmpty(_selectedSector) 
-                ? _recommendations 
-                : _recommendations.Where(r => r.Stock?.Sector == _selectedSector).ToList();
-
-            @if (displayRecommendations.Any())
-            {
-                <div class="bg-white rounded-lg shadow">
-                    <div class="px-6 py-4 border-b border-gray-200">
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
                         <h2 class="text-lg font-medium text-gray-900">
                             Investment Recommendations
-                            @if (!string.IsNullOrEmpty(_selectedSector))
+                            @if (_selectedMethodString == "AI")
                             {
-                                <span class="text-sm font-normal text-gray-500 ml-2">(@_selectedSector)</span>
+                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                    🤖 AI Generated
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    📊 Algorithm Based
+                                </span>
                             }
                         </h2>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Allocation</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Allocation</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @foreach (var recommendation in _recommendations)
+                            {
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900">@recommendation.Stock?.Symbol</div>
+                                                <div class="text-sm text-gray-500">@recommendation.Stock?.CompanyName</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">
+                                            LKR @recommendation.RecommendedAmount.ToShortForm()
+                                            <span class="text-xs text-gray-500 block">(@recommendation.RecommendedAmount.ToString("N0"))</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="text-sm text-gray-900 max-w-xs">
+                                            @recommendation.RecommendationReason
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                @foreach (var recommendation in displayRecommendations)
-                                {
-                                    <tr class="hover:bg-gray-50 cursor-pointer" @onclick="() => NavigateToStockDetails(recommendation.StockId)">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div>
-                                                    <div class="text-sm font-medium text-gray-900">@recommendation.Stock?.Symbol</div>
-                                                    <div class="text-sm text-gray-500">@recommendation.Stock?.CompanyName</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm text-gray-900">
-                                                @{
-                                                    var score = _scores.FirstOrDefault(s => s.StockId == recommendation.StockId);
-                                                    @(score?.TotalScore.ToTwoDecimalPlaces() ?? "N/A")
-                                                }
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm text-gray-900">
-                                                LKR @recommendation.RecommendedAmount.ToShortForm()
-                                                <span class="text-xs text-gray-500">(@recommendation.RecommendedAmount.ToString("N0"))</span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <div class="text-sm text-gray-900">@recommendation.RecommendationReason</div>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
+                            }
+                        </tbody>
+                    </table>
                 </div>
-            }
-            else
-            {
-                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                    <div class="flex">
-                        <div class="ml-3">
-                            <p class="text-sm text-yellow-700">
-                                No recommendations available for the selected sector.
-                                @if (!string.IsNullOrEmpty(_selectedSector))
-                                {
-                                    <button @onclick="ShowAllSectors"
-                                            class="text-blue-600 hover:text-blue-800 underline focus:outline-none ml-1">
-                                        Show all sectors
-                                    </button>
-                                }
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            }
+            </div>
         }
         else
         {
@@ -194,8 +224,8 @@
                         <p class="text-sm text-yellow-700">
                             No recommendations available.
                             <button @onclick="GenerateRecommendations"
-                                    class="text-blue-600 hover:text-blue-800 underline focus:outline-none">
-                                Generate Recommendations
+                                    class="text-indigo-600 hover:text-indigo-800 underline focus:outline-none ml-1">
+                                Generate @(_selectedMethodString == "AI" ? "AI" : "Algorithm") Recommendations
                             </button>
                         </p>
                     </div>
@@ -204,6 +234,7 @@
         }
     }
 
+    <!-- Budget Modal -->
     @if (_showBudgetModal)
     {
         <div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
@@ -228,11 +259,11 @@
                 </div>
                 <div class="flex justify-end space-x-3">
                     <button @onclick="CloseBudgetModal"
-                            class="inline-flex justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            class="inline-flex justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                         Cancel
                     </button>
                     <button @onclick="UpdateBudget"
-                            class="inline-flex justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            class="inline-flex justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
                         Update Budget
                     </button>
                 </div>

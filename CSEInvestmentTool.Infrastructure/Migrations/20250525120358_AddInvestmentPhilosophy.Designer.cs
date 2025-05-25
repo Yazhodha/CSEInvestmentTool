@@ -3,6 +3,7 @@ using System;
 using CSEInvestmentTool.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CSEInvestmentTool.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250525120358_AddInvestmentPhilosophy")]
+    partial class AddInvestmentPhilosophy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -95,42 +98,6 @@ namespace CSEInvestmentTool.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("FundamentalData");
-                });
-
-            modelBuilder.Entity("CSEInvestmentTool.Domain.Models.InvestmentPhilosophy", b =>
-                {
-                    b.Property<int>("PhilosophyId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("PhilosophyId"));
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("PromptTemplate")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("PhilosophyId");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("InvestmentPhilosophies");
                 });
 
             modelBuilder.Entity("CSEInvestmentTool.Domain.Models.InvestmentRecommendation", b =>

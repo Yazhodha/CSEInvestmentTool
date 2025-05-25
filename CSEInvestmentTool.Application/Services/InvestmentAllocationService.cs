@@ -1,25 +1,21 @@
 using CSEInvestmentTool.Application.Interfaces;
+using CSEInvestmentTool.Application.Models;
+using CSEInvestmentTool.Domain.Constants;
 using CSEInvestmentTool.Domain.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace CSEInvestmentTool.Application.Services;
 
-public interface IInvestmentAllocationService
-{
-    Task<decimal> GetMonthlyInvestmentAmountAsync();
-    Task<bool> UpdateMonthlyInvestmentAmountAsync(decimal amount);
-    Task<List<InvestmentRecommendation>> CalculateInvestmentAllocationsAsync(
-        List<StockScore> rankedStocks,
-        DateTime recommendationDate,
-        decimal? monthlyInvestmentAmount = null);
-}
-
 public class InvestmentAllocationService : IInvestmentAllocationService
 {
     private readonly ILogger<InvestmentAllocationService> _logger;
     private readonly IConfiguration _configuration;
     private readonly IAppSettingsRepository _settingsRepository;
+    private readonly ILLMInvestmentService _llmInvestmentService;
+    private readonly IStockRepository _stockRepository;
+    private readonly IFundamentalDataRepository _fundamentalDataRepository;
+    private readonly IStockScoreRepository _stockScoreRepository;
 
     // Configuration constants with default values
     private readonly decimal _defaultMonthlyInvestmentAmount;
@@ -30,27 +26,29 @@ public class InvestmentAllocationService : IInvestmentAllocationService
     public InvestmentAllocationService(
         ILogger<InvestmentAllocationService> logger,
         IConfiguration configuration,
-        IAppSettingsRepository settingsRepository)
+        IAppSettingsRepository settingsRepository,
+        ILLMInvestmentService llmInvestmentService,
+        IStockRepository stockRepository,
+        IFundamentalDataRepository fundamentalDataRepository,
+        IStockScoreRepository stockScoreRepository)
     {
         _logger = logger;
         _configuration = configuration;
         _settingsRepository = settingsRepository;
+        _llmInvestmentService = llmInvestmentService;
+        _stockRepository = stockRepository;
+        _fundamentalDataRepository = fundamentalDataRepository;
+        _stockScoreRepository = stockScoreRepository;
 
-        // Load configuration with defaults for other values
+        // Load configuration with defaults
         _defaultMonthlyInvestmentAmount = _configuration.GetValue<decimal>("Investment:MonthlyAmount", 50000m);
         _maxStocks = _configuration.GetValue<int>("Investment:MaxStocks", 5);
         _minimumAllocation = _configuration.GetValue<decimal>("Investment:MinimumAllocation", 5000m);
         _highScoreThreshold = _configuration.GetValue<decimal>("Investment:HighScoreThreshold", 80m);
-
-        _logger.LogInformation("Investment Allocation Service initialized with default values: " +
-                             "Default Monthly Amount: {MonthlyAmount}, " +
-                             "Max Stocks: {MaxStocks}, Minimum Allocation: {MinAllocation}",
-            _defaultMonthlyInvestmentAmount, _maxStocks, _minimumAllocation);
     }
 
     public async Task<decimal> GetMonthlyInvestmentAmountAsync()
     {
-        // Try to get the value from the database
         var amount = await _settingsRepository.GetSettingValueAsync<decimal>("MonthlyInvestmentAmount", _defaultMonthlyInvestmentAmount);
         return amount;
     }
@@ -72,14 +70,11 @@ public class InvestmentAllocationService : IInvestmentAllocationService
         {
             _logger.LogInformation("Monthly investment amount updated to {Amount}", amount);
         }
-        else
-        {
-            _logger.LogError("Failed to update monthly investment amount to {Amount}", amount);
-        }
 
         return result;
     }
 
+    // Existing algorithm-based method (unchanged)
     public async Task<List<InvestmentRecommendation>> CalculateInvestmentAllocationsAsync(
         List<StockScore> rankedStocks,
         DateTime recommendationDate,
@@ -87,15 +82,12 @@ public class InvestmentAllocationService : IInvestmentAllocationService
     {
         try
         {
-            // Use the provided amount or get from database
             decimal investmentAmount = monthlyInvestmentAmount ?? await GetMonthlyInvestmentAmountAsync();
 
-            _logger.LogInformation("Calculating investment allocations for {Count} stocks on {Date} with budget {Amount:C}",
-                rankedStocks.Count, recommendationDate, investmentAmount);
+            _logger.LogInformation("Calculating ALGORITHM-based investment allocations for {Count} stocks with budget {Amount:C}",
+                rankedStocks.Count, investmentAmount);
 
             var recommendations = new List<InvestmentRecommendation>();
-
-            // Filter out scores of inactive stocks
             var activeStocks = rankedStocks.Where(s => s.Stock?.IsActive == true).ToList();
 
             if (activeStocks.Count == 0)
@@ -104,30 +96,23 @@ public class InvestmentAllocationService : IInvestmentAllocationService
                 return recommendations;
             }
 
-            // Sort by score in descending order and take top ranked stocks
             var topStocks = activeStocks
                 .OrderByDescending(s => s.TotalScore)
                 .Take(_maxStocks)
                 .ToList();
 
-            // Calculate total score for proportional allocation
             decimal totalScore = topStocks.Sum(s => s.TotalScore);
             decimal remainingAmount = investmentAmount;
 
-            // Generate recommendations for each stock
             foreach (var stock in topStocks)
             {
-                if (remainingAmount <= 0)
-                    break;
+                if (remainingAmount <= 0) break;
 
                 var recommendation = CalculateStockAllocation(stock, totalScore, investmentAmount, ref remainingAmount, recommendationDate);
                 recommendations.Add(recommendation);
-
-                _logger.LogDebug("Allocated {Amount:C} to stock {StockId}. Remaining amount: {Remaining:C}",
-                    recommendation.RecommendedAmount, stock.StockId, remainingAmount);
             }
 
-            // Distribute any remaining amount proportionally among existing recommendations
+            // Distribute any remaining amount proportionally
             if (remainingAmount > 0 && recommendations.Any())
             {
                 decimal totalCurrentAllocation = recommendations.Sum(r => r.RecommendedAmount);
@@ -139,22 +124,128 @@ public class InvestmentAllocationService : IInvestmentAllocationService
                     remainingAmount -= additionalAmount;
                 }
 
-                // Add any leftover cents to the first recommendation
                 if (remainingAmount > 0)
                 {
                     recommendations[0].RecommendedAmount += remainingAmount;
                 }
-
-                _logger.LogInformation("Distributed remaining amount proportionally among recommendations");
             }
 
             return recommendations;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calculating investment allocations");
+            _logger.LogError(ex, "Error calculating algorithm-based investment allocations");
             throw;
         }
+    }
+
+    // NEW: LLM-based recommendation method
+    public async Task<List<InvestmentRecommendation>> GenerateLLMRecommendationsAsync(
+        InvestmentPhilosophyType philosophy,
+        DateTime recommendationDate,
+        decimal? monthlyInvestmentAmount = null,
+        string? additionalInstructions = null)
+    {
+        try
+        {
+            decimal investmentAmount = monthlyInvestmentAmount ?? await GetMonthlyInvestmentAmountAsync();
+
+            _logger.LogInformation("Generating LLM-based investment recommendations using {Philosophy} philosophy with budget {Amount:C}",
+                philosophy, investmentAmount);
+
+            // Get all active stocks with their fundamental data and scores
+            var stocks = await _stockRepository.GetAllStocksAsync();
+            var activeStocks = stocks.Where(s => s.IsActive).ToList();
+
+            if (!activeStocks.Any())
+            {
+                _logger.LogWarning("No active stocks found for LLM analysis");
+                return new List<InvestmentRecommendation>();
+            }
+
+            // Prepare stock data for LLM analysis
+            var stockDataList = new List<StockDataForAnalysis>();
+
+            foreach (var stock in activeStocks)
+            {
+                var fundamentalData = await _fundamentalDataRepository.GetLatestFundamentalDataForStockAsync(stock.StockId);
+                var score = await _stockScoreRepository.GetLatestScoreForStockAsync(stock.StockId);
+
+                if (fundamentalData != null)
+                {
+                    stockDataList.Add(new StockDataForAnalysis
+                    {
+                        StockId = stock.StockId,
+                        Symbol = stock.Symbol,
+                        CompanyName = stock.CompanyName,
+                        Sector = stock.Sector,
+                        MarketPrice = fundamentalData.MarketPrice,
+                        NAV = fundamentalData.NAV,
+                        EPS = fundamentalData.EPS,
+                        AnnualDividend = fundamentalData.AnnualDividend,
+                        TotalLiabilities = fundamentalData.TotalLiabilities,
+                        TotalEquity = fundamentalData.TotalEquity,
+                        PERatio = fundamentalData.PERatio,
+                        ROE = fundamentalData.ROE,
+                        DividendYield = fundamentalData.DividendYield,
+                        DebtToEquityRatio = fundamentalData.DebtToEquityRatio,
+                        PBV = fundamentalData.PBV,
+                        Return = fundamentalData.Return,
+                        CurrentAlgorithmScore = score?.TotalScore
+                    });
+                }
+            }
+
+            if (!stockDataList.Any())
+            {
+                _logger.LogWarning("No stocks with fundamental data found for LLM analysis");
+                return new List<InvestmentRecommendation>();
+            }
+
+            // Create LLM request
+            var llmRequest = new LLMInvestmentRequest
+            {
+                Philosophy = philosophy,
+                MonthlyBudget = investmentAmount,
+                Stocks = stockDataList,
+                AdditionalInstructions = additionalInstructions
+            };
+
+            // Get LLM recommendations
+            var llmResponse = await _llmInvestmentService.GenerateRecommendationsAsync(llmRequest);
+
+            if (!llmResponse.Success)
+            {
+                _logger.LogError("LLM analysis failed: {Error}", llmResponse.ErrorMessage);
+                throw new InvalidOperationException($"LLM analysis failed: {llmResponse.ErrorMessage}");
+            }
+
+            // Convert to domain recommendations
+            var recommendations = await _llmInvestmentService.ConvertToInvestmentRecommendationsAsync(llmResponse, recommendationDate);
+
+            _logger.LogInformation("Successfully generated {Count} LLM-based recommendations", recommendations.Count);
+
+            return recommendations;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating LLM-based investment recommendations");
+            throw;
+        }
+    }
+
+    public async Task<RecommendationMethod> GetLastRecommendationMethodAsync()
+    {
+        var methodString = await _settingsRepository.GetSettingValueAsync("LastRecommendationMethod", "Algorithm");
+        return Enum.TryParse<RecommendationMethod>(methodString, out var method) ? method : RecommendationMethod.Algorithm;
+    }
+
+    public async Task<bool> SetRecommendationMethodAsync(RecommendationMethod method)
+    {
+        return await _settingsRepository.UpdateSettingAsync(
+            "LastRecommendationMethod",
+            method.ToString(),
+            "Last used recommendation method (Algorithm or LLM)");
     }
 
     private InvestmentRecommendation CalculateStockAllocation(
@@ -174,14 +265,12 @@ public class InvestmentAllocationService : IInvestmentAllocationService
         // Ensure minimum allocation
         if (recommendedAmount < _minimumAllocation)
         {
-            _logger.LogDebug("Adjusting allocation for stock {StockId} to minimum amount", stock.StockId);
             recommendedAmount = _minimumAllocation;
         }
 
         // Adjust for remaining amount
         if (recommendedAmount > remainingAmount)
         {
-            _logger.LogDebug("Adjusting allocation for stock {StockId} to remaining amount", stock.StockId);
             recommendedAmount = remainingAmount;
         }
 
@@ -192,12 +281,12 @@ public class InvestmentAllocationService : IInvestmentAllocationService
             StockId = stock.StockId,
             RecommendationDate = recommendationDate,
             RecommendedAmount = recommendedAmount,
-            RecommendationReason = GenerateRecommendationReason(stock),
+            RecommendationReason = GenerateAlgorithmRecommendationReason(stock),
             LastUpdated = DateTime.UtcNow
         };
     }
 
-    private string GenerateRecommendationReason(StockScore score)
+    private string GenerateAlgorithmRecommendationReason(StockScore score)
     {
         var reasons = new List<string>();
 
@@ -215,10 +304,6 @@ public class InvestmentAllocationService : IInvestmentAllocationService
         if (!reasons.Any())
             reasons.Add("Overall balanced performance");
 
-        var reason = string.Join(". ", reasons) + ".";
-        _logger.LogDebug("Generated recommendation reason for stock {StockId}: {Reason}",
-            score.StockId, reason);
-
-        return reason;
+        return "Algorithm Analysis: " + string.Join(". ", reasons) + ".";
     }
 }

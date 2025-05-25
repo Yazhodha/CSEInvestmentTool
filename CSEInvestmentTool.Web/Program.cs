@@ -12,15 +12,18 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddControllers();
 
-// Add HttpClient
+// Add HttpClient and Memory Cache
 builder.Services.AddHttpClient();
 builder.Services.AddMemoryCache();
 
-// Register services
+// Register existing services
 builder.Services.AddScoped<IDataCollectionService, CSEDataCollectionService>();
-// In Program.cs
 builder.Services.AddScoped<IStockScoringService, StockScoringService>();
 builder.Services.AddScoped<IInvestmentAllocationService, InvestmentAllocationService>();
+
+// Register GENERIC LLM services
+builder.Services.AddScoped<ILLMProviderFactory, LLMProviderFactory>();
+builder.Services.AddScoped<ILLMInvestmentService, LLMInvestmentService>();
 
 // Add PostgreSQL DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
