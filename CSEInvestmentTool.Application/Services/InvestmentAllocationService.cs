@@ -139,7 +139,7 @@ public class InvestmentAllocationService : IInvestmentAllocationService
         }
     }
 
-    // NEW: LLM-based recommendation method
+    // UPDATED: LLM-based recommendation method with sector filtering
     public async Task<List<InvestmentRecommendation>> GenerateLLMRecommendationsAsync(
         InvestmentPhilosophyType philosophy,
         DateTime recommendationDate,
@@ -161,6 +161,26 @@ public class InvestmentAllocationService : IInvestmentAllocationService
             {
                 _logger.LogWarning("No active stocks found for LLM analysis");
                 return new List<InvestmentRecommendation>();
+            }
+
+            // Filter by sector if specified in additional instructions
+            if (!string.IsNullOrEmpty(additionalInstructions) && additionalInstructions.Contains("sector"))
+            {
+                var sectorMatch = System.Text.RegularExpressions.Regex.Match(
+                    additionalInstructions,
+                    @"Focus analysis on (\w+(?:\s+\w+)*) sector",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                if (sectorMatch.Success)
+                {
+                    var targetSector = sectorMatch.Groups[1].Value;
+                    activeStocks = activeStocks
+                        .Where(s => s.Sector?.Equals(targetSector, StringComparison.OrdinalIgnoreCase) == true)
+                        .ToList();
+
+                    _logger.LogInformation("Filtered to {Count} stocks in {Sector} sector for LLM analysis",
+                        activeStocks.Count, targetSector);
+                }
             }
 
             // Prepare stock data for LLM analysis

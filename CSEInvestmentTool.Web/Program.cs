@@ -16,12 +16,26 @@ builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 builder.Services.AddMemoryCache();
 
+// Configure HttpClient with longer timeout for LLM operations
+builder.Services.AddHttpClient("LLM_Deepseek", client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(5); // 5 minute timeout for AI analysis
+});
+
+builder.Services.AddHttpClient("LLM_Groq", client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(3); // 3 minute timeout for Groq (faster)
+});
+
+// Register caching service
+builder.Services.AddScoped<ILLMCacheService, LLMCacheService>();
+
 // Register existing services
 builder.Services.AddScoped<IDataCollectionService, CSEDataCollectionService>();
 builder.Services.AddScoped<IStockScoringService, StockScoringService>();
 builder.Services.AddScoped<IInvestmentAllocationService, InvestmentAllocationService>();
 
-// Register GENERIC LLM services
+// Register LLM services
 builder.Services.AddScoped<ILLMProviderFactory, LLMProviderFactory>();
 builder.Services.AddScoped<ILLMInvestmentService, LLMInvestmentService>();
 
@@ -29,7 +43,11 @@ builder.Services.AddScoped<ILLMInvestmentService, LLMInvestmentService>();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
-        npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()
+        npgsqlOptions =>
+        {
+            npgsqlOptions.EnableRetryOnFailure();
+            npgsqlOptions.CommandTimeout(300); // 5 minute command timeout for complex queries
+        }
     ));
 
 // Register repositories
@@ -58,7 +76,12 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-app.MapBlazorHub();
+app.MapBlazorHub(options =>
+{
+    // Increase SignalR timeout for long-running AI operations
+    options.TransportSendTimeout = TimeSpan.FromMinutes(6);
+});
+
 app.MapFallbackToPage("/_Host");
 app.MapControllers();
 
@@ -71,6 +94,12 @@ if (app.Environment.IsDevelopment())
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         // Apply migrations
         await dbContext.Database.MigrateAsync();
+
+        // Log available LLM providers
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        var llmFactory = scope.ServiceProvider.GetRequiredService<ILLMProviderFactory>();
+        var availableProviders = llmFactory.GetAvailableProviders();
+        logger.LogInformation("Available LLM providers: {Providers}", string.Join(", ", availableProviders));
     }
     catch (Exception ex)
     {

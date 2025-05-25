@@ -11,17 +11,20 @@ public class LLMProviderFactory : ILLMProviderFactory
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly ILLMCacheService _cacheService;
     private readonly Dictionary<LLMProvider, LLMProviderConfig> _providerConfigs;
 
     public LLMProviderFactory(
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        ILLMCacheService cacheService)
     {
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _loggerFactory = loggerFactory;
         _providerConfigs = LoadProviderConfigurations();
+        _cacheService = cacheService;
     }
 
     public ILLMProvider CreateProvider(LLMProvider provider)
@@ -38,7 +41,7 @@ public class LLMProviderFactory : ILLMProviderFactory
             LLMProvider.Deepseek => new DeepseekLLMProvider(
                 httpClient,
                 _loggerFactory.CreateLogger<DeepseekLLMProvider>(),
-                config),
+                config, _cacheService),
 
             // Future providers can be added here:
             // LLMProvider.OpenAI => new OpenAILLMProvider(httpClient, logger, config),

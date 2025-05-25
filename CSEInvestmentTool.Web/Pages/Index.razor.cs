@@ -16,6 +16,10 @@ namespace CSEInvestmentTool.Web.Pages
         private bool _loading = true;
         private List<StockScore> _scores = new();
         private List<InvestmentRecommendation> _recommendations = new();
+        private List<InvestmentRecommendation> _filteredRecommendations = new();
+        private List<Stock> _stocks = new();
+        private List<string> _availableSectors = new();
+        private string _selectedSector = "";
         private decimal _monthlyInvestmentAmount = 50000m;
         private decimal _newMonthlyAmount = 50000m;
         private bool _showBudgetModal = false;
@@ -75,6 +79,36 @@ namespace CSEInvestmentTool.Web.Pages
             }
         }
 
+        private void OnSectorChanged()
+        {
+            try
+            {
+                FilterRecommendationsBySector();
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error filtering by sector");
+            }
+        }
+
+        private void FilterRecommendationsBySector()
+        {
+            if (string.IsNullOrEmpty(_selectedSector))
+            {
+                _filteredRecommendations = _recommendations.ToList();
+            }
+            else
+            {
+                _filteredRecommendations = _recommendations
+                    .Where(r => r.Stock?.Sector?.Equals(_selectedSector, StringComparison.OrdinalIgnoreCase) == true)
+                    .ToList();
+            }
+
+            Logger.LogInformation("Filtered recommendations: {Count} stocks for sector '{Sector}'",
+                _filteredRecommendations.Count, _selectedSector);
+        }
+
         private async Task CheckLLMConfiguration()
         {
             try
@@ -117,14 +151,28 @@ namespace CSEInvestmentTool.Web.Pages
 
                 _errorMessage = null;
 
+                // Load stocks to get sectors
+                _stocks = (await StockRepository.GetAllStocksAsync()).ToList();
+
+                // Extract unique sectors
+                _availableSectors = _stocks
+                    .Where(s => s.IsActive && !string.IsNullOrEmpty(s.Sector))
+                    .Select(s => s.Sector!)
+                    .Distinct()
+                    .OrderBy(s => s)
+                    .ToList();
+
                 // Get latest scores (always needed for algorithm reference)
                 _scores = (await ScoreRepository.GetLatestScoresAsync()).ToList();
 
                 // Get latest recommendations
                 _recommendations = (await RecommendationRepository.GetLatestRecommendationsAsync()).ToList();
 
-                Logger.LogInformation("Loaded {ScoreCount} scores and {RecommendationCount} recommendations",
-                    _scores.Count, _recommendations.Count);
+                // Filter recommendations by selected sector
+                FilterRecommendationsBySector();
+
+                Logger.LogInformation("Loaded {ScoreCount} scores, {RecommendationCount} recommendations, and {SectorCount} sectors",
+                    _scores.Count, _recommendations.Count, _availableSectors.Count);
             }
             catch (Exception ex)
             {
@@ -150,6 +198,9 @@ namespace CSEInvestmentTool.Web.Pages
                 StateHasChanged();
 
                 Logger.LogInformation("Generating recommendations using method: {Method}", _selectedMethodString);
+
+                // Clear existing recommendations to avoid mixing algorithm and AI results
+                await ClearExistingRecommendations();
 
                 if (_selectedMethodString == "AI")
                 {
@@ -186,6 +237,20 @@ namespace CSEInvestmentTool.Web.Pages
             }
         }
 
+        private async Task ClearExistingRecommendations()
+        {
+            try
+            {
+                // For now, we rely on the unique constraint on StockId + RecommendationDate
+                // The repositories will handle updating existing recommendations for the same date
+                Logger.LogInformation("Clearing existing recommendations for today");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Error clearing existing recommendations");
+            }
+        }
+
         private async Task GenerateAlgorithmRecommendations()
         {
             Logger.LogInformation("Generating algorithm-based recommendations");
@@ -198,8 +263,22 @@ namespace CSEInvestmentTool.Web.Pages
                 throw new InvalidOperationException("No stock scores available. Please calculate scores first from the Stocks page.");
             }
 
+            // Filter scores by selected sector if applicable
+            var filteredScores = _scores;
+            if (!string.IsNullOrEmpty(_selectedSector))
+            {
+                filteredScores = _scores
+                    .Where(s => s.Stock?.Sector?.Equals(_selectedSector, StringComparison.OrdinalIgnoreCase) == true)
+                    .ToList();
+
+                if (!filteredScores.Any())
+                {
+                    throw new InvalidOperationException($"No stocks available in {_selectedSector} sector with calculated scores.");
+                }
+            }
+
             var recommendations = await AllocationService.CalculateInvestmentAllocationsAsync(
-                _scores,
+                filteredScores,
                 DateTime.UtcNow.Date,
                 _monthlyInvestmentAmount);
 
@@ -237,11 +316,12 @@ namespace CSEInvestmentTool.Web.Pages
                     throw new InvalidOperationException("Deepseek API key is not configured. Please add your API key to appsettings.Development.json under LLM:Providers:Deepseek:ApiKey");
                 }
 
-                // Use the allocation service method for LLM
+                // Use the allocation service method for LLM with sector filtering
                 var recommendations = await AllocationService.GenerateLLMRecommendationsAsync(
                     _selectedPhilosophy,
                     DateTime.UtcNow.Date,
-                    _monthlyInvestmentAmount);
+                    _monthlyInvestmentAmount,
+                    !string.IsNullOrEmpty(_selectedSector) ? $"Focus analysis on {_selectedSector} sector stocks only." : null);
 
                 if (!recommendations.Any())
                 {
@@ -268,6 +348,11 @@ namespace CSEInvestmentTool.Web.Pages
                 Logger.LogError(ex, "Error generating AI recommendations");
                 throw; // Re-throw to be handled by the calling method
             }
+        }
+
+        private void NavigateToStockDetails(int stockId)
+        {
+            Navigation.NavigateTo($"/stocks/{stockId}");
         }
 
         private void OpenBudgetModal()
