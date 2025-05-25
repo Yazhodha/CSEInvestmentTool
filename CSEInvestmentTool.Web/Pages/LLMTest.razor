@@ -70,18 +70,18 @@
         }
 
         <div class="flex space-x-4">
-            <button @onclick="RunBasicTests" disabled="_testing"
-                    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+            <button @onclick="RunBasicTests" disabled="@_testing"
+                    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
                 @(_testing ? "Testing..." : "Run Basic Tests")
             </button>
 
-            <button @onclick="RunFullLLMTest"
-                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
+            <button @onclick="RunFullLLMTest" disabled="@_testing"
+                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
                 @(_testing ? "Testing..." : "Test Actual LLM Call")
             </button>
 
-            <button @onclick="ClearLogs"
-                    class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
+            <button @onclick="ClearLogs" disabled="@_testing"
+                    class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
                 Clear Logs
             </button>
         </div>
@@ -131,6 +131,8 @@
 
     private async Task RunBasicTests()
     {
+        if (_testing) return; // Prevent multiple simultaneous tests
+
         AddLog("🔍 Starting basic tests...");
         _testing = true;
         _testResults.Clear();
@@ -214,6 +216,8 @@
 
     private async Task RunFullLLMTest()
     {
+        if (_testing) return; // Prevent multiple simultaneous tests
+
         AddLog("🤖 Starting full LLM test with actual API call...");
         _testing = true;
         _errorMessage = null;
@@ -272,6 +276,8 @@
 
     private void ClearLogs()
     {
+        if (_testing) return; // Prevent clearing logs during tests
+
         _logs.Clear();
         _testResults.Clear();
         _errorMessage = null;
@@ -283,7 +289,12 @@
         var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
         _logs.Add($"[{timestamp}] {message}");
         Logger.LogInformation("LLM Test: {Message}", message);
-        StateHasChanged();
+
+        // Only call StateHasChanged if not currently testing to avoid excessive updates
+        if (!_testing)
+        {
+            StateHasChanged();
+        }
     }
 
     private string GetLogClass(string log)

@@ -115,7 +115,7 @@ public class LLMProviderFactory : ILLMProviderFactory
     {
         return provider switch
         {
-            LLMProvider.Deepseek => "https://api.deepseek.com/v1/chat/completions",
+            LLMProvider.Deepseek => "https://api.deepseek.com/chat/completions",
             LLMProvider.OpenAI => "https://api.openai.com/v1/chat/completions",
             LLMProvider.Anthropic => "https://api.anthropic.com/v1/messages",
             _ => throw new NotSupportedException($"No default endpoint for provider {provider}")
@@ -126,7 +126,7 @@ public class LLMProviderFactory : ILLMProviderFactory
     {
         return provider switch
         {
-            LLMProvider.Deepseek => "deepseek-r1",
+            LLMProvider.Deepseek => "deepseek-chat", // Changed from "deepseek-r1" to correct model name
             LLMProvider.OpenAI => "gpt-4",
             LLMProvider.Anthropic => "claude-3-sonnet-20240229",
             _ => throw new NotSupportedException($"No default model for provider {provider}")

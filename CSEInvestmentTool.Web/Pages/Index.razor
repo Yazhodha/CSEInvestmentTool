@@ -22,8 +22,8 @@
             <!-- Method Selection -->
             <div class="flex items-center space-x-2">
                 <label class="text-sm font-medium text-gray-700">Method:</label>
-                <select @bind="_selectedMethodString" @bind:after="OnMethodChanged"
-                        class="block w-32 pl-3 pr-8 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                <select @bind="_selectedMethodString" @bind:after="OnMethodChanged" disabled="@_loading"
+                        class="block w-32 pl-3 pr-8 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
                     <option value="Algorithm">Algorithm</option>
                     <option value="AI">AI Analysis</option>
                 </select>
@@ -34,8 +34,8 @@
             {
                 <div class="flex items-center space-x-2">
                     <label class="text-sm font-medium text-gray-700">Philosophy:</label>
-                    <select @bind="_selectedPhilosophy"
-                            class="block w-40 pl-3 pr-8 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                    <select @bind="_selectedPhilosophy" disabled="@_loading"
+                            class="block w-40 pl-3 pr-8 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
                         <option value="@InvestmentPhilosophyType.ValueInvesting">Value Investing</option>
                         <option value="@InvestmentPhilosophyType.GrowthInvesting">Growth Investing</option>
                         <option value="@InvestmentPhilosophyType.DividendInvesting">Dividend Focus</option>
@@ -45,8 +45,8 @@
                 </div>
             }
 
-            <button @onclick="GenerateRecommendations" disabled="_loading"
-                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
+            <button @onclick="GenerateRecommendations" disabled="@_loading"
+                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400">
                 @if (_loading)
                 {
                     <span class="mr-2">⏳</span>
@@ -118,8 +118,8 @@
                         </p>
                     </div>
                     <div>
-                        <button @onclick="OpenBudgetModal"
-                                class="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <button @onclick="OpenBudgetModal" disabled="@_loading"
+                                class="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                             </svg>
@@ -223,8 +223,8 @@
                     <div class="ml-3">
                         <p class="text-sm text-yellow-700">
                             No recommendations available.
-                            <button @onclick="GenerateRecommendations"
-                                    class="text-indigo-600 hover:text-indigo-800 underline focus:outline-none ml-1">
+                            <button @onclick="GenerateRecommendations" disabled="@_loading"
+                                    class="text-indigo-600 hover:text-indigo-800 underline focus:outline-none ml-1 disabled:text-gray-400 disabled:cursor-not-allowed">
                                 Generate @(_selectedMethodString == "AI" ? "AI" : "Algorithm") Recommendations
                             </button>
                         </p>

@@ -45,6 +45,7 @@ namespace CSEInvestmentTool.Web.Pages
             finally
             {
                 _loading = false;
+                StateHasChanged(); // Ensure UI updates when loading is complete
             }
         }
 
@@ -70,6 +71,7 @@ namespace CSEInvestmentTool.Web.Pages
             {
                 Logger.LogError(ex, "Error changing method");
                 _errorMessage = "Error changing method. Please try again.";
+                StateHasChanged();
             }
         }
 
@@ -106,7 +108,13 @@ namespace CSEInvestmentTool.Web.Pages
         {
             try
             {
-                _loading = true;
+                // Don't set loading to true here if already loading to prevent UI flicker
+                if (!_loading)
+                {
+                    _loading = true;
+                    StateHasChanged();
+                }
+
                 _errorMessage = null;
 
                 // Get latest scores (always needed for algorithm reference)
@@ -126,11 +134,14 @@ namespace CSEInvestmentTool.Web.Pages
             finally
             {
                 _loading = false;
+                StateHasChanged();
             }
         }
 
         private async Task GenerateRecommendations()
         {
+            if (_loading) return; // Prevent multiple simultaneous operations
+
             try
             {
                 _loading = true;
@@ -261,6 +272,8 @@ namespace CSEInvestmentTool.Web.Pages
 
         private void OpenBudgetModal()
         {
+            if (_loading) return; // Prevent opening modal during loading
+
             _newMonthlyAmount = _monthlyInvestmentAmount;
             _budgetErrorMessage = null;
             _showBudgetModal = true;
@@ -288,6 +301,7 @@ namespace CSEInvestmentTool.Web.Pages
                     _monthlyInvestmentAmount = _newMonthlyAmount;
                     _showBudgetModal = false;
                     _successMessage = $"Monthly budget updated to LKR {_monthlyInvestmentAmount:N0}";
+                    StateHasChanged();
                 }
                 else
                 {
