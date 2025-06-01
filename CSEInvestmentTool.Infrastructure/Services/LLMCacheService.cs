@@ -1,4 +1,5 @@
-﻿using CSEInvestmentTool.Application.Models.LLM;
+﻿using CSEInvestmentTool.Application.Interfaces;
+using CSEInvestmentTool.Application.Models.LLM;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
@@ -6,14 +7,6 @@ using System.Text;
 using System.Text.Json;
 
 namespace CSEInvestmentTool.Infrastructure.Services;
-
-public interface ILLMCacheService
-{
-    Task<LLMResponse?> GetCachedResponseAsync(string cacheKey);
-    Task SetCachedResponseAsync(string cacheKey, LLMResponse response, TimeSpan? expiration = null);
-    string GenerateCacheKey(LLMRequest request, string providerName);
-    void ClearCache();
-}
 
 public class LLMCacheService : ILLMCacheService
 {
@@ -50,6 +43,13 @@ public class LLMCacheService : ILLMCacheService
     {
         try
         {
+            // Don't cache error responses
+            if (!response.Success)
+            {
+                _logger.LogInformation("Skipping cache for failed response with key: {CacheKey}", cacheKey[..Math.Min(20, cacheKey.Length)]);
+                return;
+            }
+
             var json = JsonSerializer.Serialize(response);
             var cacheOptions = new MemoryCacheEntryOptions
             {
