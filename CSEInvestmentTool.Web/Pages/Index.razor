@@ -23,7 +23,7 @@
             <!-- Sector Filter -->
             <div class="flex items-center space-x-2">
                 <label class="text-sm font-medium text-gray-700">Sector:</label>
-                <select @bind="_selectedSector" @bind:after="OnSectorChanged" disabled="@_loading"
+                <select @bind="_selectedSector" @bind:after="OnSectorChanged" disabled="@(_loading || _methodSwitching)"
                         class="block w-40 pl-3 pr-8 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
                     <option value="">All Sectors</option>
                     @foreach (var sector in _availableSectors)
@@ -36,7 +36,7 @@
             <!-- Method Selection -->
             <div class="flex items-center space-x-2">
                 <label class="text-sm font-medium text-gray-700">Method:</label>
-                <select @bind="_selectedMethodString" @bind:after="OnMethodChanged" disabled="@_loading"
+                <select @bind="_selectedMethodString" @bind:after="OnMethodChanged" disabled="@(_loading || _methodSwitching)"
                         class="block w-32 pl-3 pr-8 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
                     <option value="Algorithm">Algorithm</option>
                     <option value="AI">AI Analysis</option>
@@ -48,7 +48,7 @@
             {
                 <div class="flex items-center space-x-2">
                     <label class="text-sm font-medium text-gray-700">Philosophy:</label>
-                    <select @bind="_selectedPhilosophy" disabled="@_loading"
+                    <select @bind="_selectedPhilosophy" disabled="@(_loading || _methodSwitching)"
                             class="block w-40 pl-3 pr-8 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
                         <option value="@InvestmentPhilosophyType.ValueInvesting">Value Investing</option>
                         <option value="@InvestmentPhilosophyType.GrowthInvesting">Growth Investing</option>
@@ -59,12 +59,17 @@
                 </div>
             }
 
-            <button @onclick="GenerateRecommendations" disabled="@_loading"
+            <button @onclick="GenerateRecommendations" disabled="@(_loading || _methodSwitching)"
                     class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400">
                 @if (_loading)
                 {
                     <span class="mr-2">⏳</span>
                     <span>@(_selectedMethodString == "AI" ? "AI Analyzing..." : "Calculating...")</span>
+                }
+                else if (_methodSwitching)
+                {
+                    <span class="mr-2">🔄</span>
+                    <span>Switching...</span>
                 }
                 else
                 {
@@ -108,7 +113,16 @@
         </div>
     }
 
-    @if (_loading)
+    @if (_methodSwitching)
+    {
+        <div class="flex justify-center items-center h-32">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                <p class="mt-2 text-sm text-gray-600">Switching analysis method...</p>
+            </div>
+        </div>
+    }
+    else if (_loading)
     {
         <div class="flex justify-center items-center h-32">
             <div class="text-center">
@@ -136,7 +150,7 @@
                         </p>
                     </div>
                     <div>
-                        <button @onclick="OpenBudgetModal" disabled="@_loading"
+                        <button @onclick="OpenBudgetModal" disabled="@(_loading || _methodSwitching)"
                                 class="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -186,15 +200,38 @@
 
         @if (_filteredRecommendations?.Any() == true)
         {
+            <!-- Method Mismatch Warning -->
+            @if (_currentRecommendationMethod != null && _currentRecommendationMethod != _selectedMethodString)
+            {
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded mb-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                <strong>Method Mismatch:</strong> You've selected <strong>@_selectedMethodString</strong> method, but showing <strong>@_currentRecommendationMethod</strong> recommendations from @_lastRecommendationDate?.ToString("MMM dd, yyyy").
+                                <button @onclick="GenerateRecommendations" disabled="@(_loading || _methodSwitching)"
+                                        class="text-indigo-600 hover:text-indigo-800 underline focus:outline-none ml-1 disabled:text-gray-400 disabled:cursor-not-allowed">
+                                    Generate new @_selectedMethodString recommendations
+                                </button>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            }
+
             <div class="bg-white rounded-lg shadow">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <div class="flex justify-between items-center">
                         <h2 class="text-lg font-medium text-gray-900">
                             Investment Recommendations
-                            @if (_selectedMethodString == "AI")
+                            @if (_currentRecommendationMethod == "AI")
                             {
                                 <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                    🤖 AI Generated
+                                    🤖 AI Generated (@_selectedPhilosophy.ToString().Replace("Investing", ""))
                                 </span>
                             }
                             else
@@ -207,6 +244,12 @@
                             {
                                 <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                                     📂 @_selectedSector
+                                </span>
+                            }
+                            @if (_lastRecommendationDate.HasValue)
+                            {
+                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                    📅 @_lastRecommendationDate.Value.ToString("MMM dd, yyyy")
                                 </span>
                             }
                         </h2>
@@ -271,9 +314,9 @@
                             }
                             else
                             {
-                                <span>No recommendations available.</span>
+                                <span>No recommendations available. Generate your first analysis to get started!</span>
                             }
-                            <button @onclick="GenerateRecommendations" disabled="@_loading"
+                            <button @onclick="GenerateRecommendations" disabled="@(_loading || _methodSwitching)"
                                     class="text-indigo-600 hover:text-indigo-800 underline focus:outline-none ml-1 disabled:text-gray-400 disabled:cursor-not-allowed">
                                 Generate @(_selectedMethodString == "AI" ? "AI" : "Algorithm") Recommendations
                             </button>

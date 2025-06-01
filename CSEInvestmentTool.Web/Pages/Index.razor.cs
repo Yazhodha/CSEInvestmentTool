@@ -26,6 +26,9 @@ namespace CSEInvestmentTool.Web.Pages
         private string? _budgetErrorMessage;
         private string? _errorMessage;
         private string? _successMessage;
+        private string? _currentRecommendationMethod = null;
+        private DateTime? _lastRecommendationDate = null;
+        private bool _methodSwitching = false;
 
         // Fixed method selection using string
         private string _selectedMethodString = "Algorithm";
@@ -57,24 +60,40 @@ namespace CSEInvestmentTool.Web.Pages
         {
             try
             {
+                _methodSwitching = true;
+                StateHasChanged();
+
                 // Clear any previous messages when method changes
                 _errorMessage = null;
                 _successMessage = null;
 
                 Logger.LogInformation("Method changed to: {Method}", _selectedMethodString);
 
+                // Clear recommendations if switching methods
+                if (_currentRecommendationMethod != null && _currentRecommendationMethod != _selectedMethodString)
+                {
+                    _recommendations.Clear();
+                    _filteredRecommendations.Clear();
+                    _currentRecommendationMethod = null;
+                    _lastRecommendationDate = null;
+
+                    Logger.LogInformation("Cleared previous recommendations due to method change");
+                }
+
                 // If switching to AI, check if LLM service is configured
                 if (_selectedMethodString == "AI")
                 {
                     await CheckLLMConfiguration();
                 }
-
-                StateHasChanged();
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Error changing method");
                 _errorMessage = "Error changing method. Please try again.";
+            }
+            finally
+            {
+                _methodSwitching = false;
                 StateHasChanged();
             }
         }
@@ -168,6 +187,23 @@ namespace CSEInvestmentTool.Web.Pages
                 // Get latest recommendations
                 _recommendations = (await RecommendationRepository.GetLatestRecommendationsAsync()).ToList();
 
+                // Determine which method generated current recommendations
+                if (_recommendations.Any())
+                {
+                    var firstRecommendation = _recommendations.First();
+                    _lastRecommendationDate = firstRecommendation.RecommendationDate;
+
+                    // Check if recommendations contain AI analysis indicators
+                    bool hasAIRecommendations = _recommendations.Any(r =>
+                        r.RecommendationReason?.Contains("Deepseek Analysis") == true ||
+                        r.RecommendationReason?.Contains("AI Analysis") == true);
+
+                    _currentRecommendationMethod = hasAIRecommendations ? "AI" : "Algorithm";
+
+                    Logger.LogInformation("Detected {Method} recommendations from {Date}",
+                        _currentRecommendationMethod, _lastRecommendationDate);
+                }
+
                 // Filter recommendations by selected sector
                 FilterRecommendationsBySector();
 
@@ -210,6 +246,10 @@ namespace CSEInvestmentTool.Web.Pages
                 {
                     await GenerateAlgorithmRecommendations();
                 }
+
+                // Set the current method and date
+                _currentRecommendationMethod = _selectedMethodString;
+                _lastRecommendationDate = DateTime.UtcNow.Date;
 
                 // Reload data to get the latest recommendations
                 await LoadData();
