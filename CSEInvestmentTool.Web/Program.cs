@@ -92,11 +92,16 @@ if (app.Environment.IsDevelopment())
     try
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        // Apply migrations
         await dbContext.Database.MigrateAsync();
 
-        // Log available LLM providers
+        // Clear LLM cache in development to avoid cached issues
+        var cacheService = scope.ServiceProvider.GetRequiredService<ILLMCacheService>();
+        cacheService.ClearCache();
+
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Cleared LLM cache for development environment");
+
+        // Log available LLM providers
         var llmFactory = scope.ServiceProvider.GetRequiredService<ILLMProviderFactory>();
         var availableProviders = llmFactory.GetAvailableProviders();
         logger.LogInformation("Available LLM providers: {Providers}", string.Join(", ", availableProviders));

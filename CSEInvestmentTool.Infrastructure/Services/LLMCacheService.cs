@@ -27,13 +27,25 @@ public class LLMCacheService : ILLMCacheService
             if (_cache.TryGetValue(cacheKey, out string? cachedJson) && !string.IsNullOrEmpty(cachedJson))
             {
                 var response = JsonSerializer.Deserialize<LLMResponse>(cachedJson);
-                _logger.LogInformation("Cache hit for key: {CacheKey}", cacheKey[..Math.Min(20, cacheKey.Length)]);
-                return response;
+
+                // Validate cached response has content
+                if (response != null && response.Success && !string.IsNullOrWhiteSpace(response.Content))
+                {
+                    _logger.LogInformation("Cache hit for key: {CacheKey}", cacheKey[..Math.Min(20, cacheKey.Length)]);
+                    return response;
+                }
+                else
+                {
+                    _logger.LogWarning("Cached response invalid (empty content), removing from cache: {CacheKey}", cacheKey[..Math.Min(20, cacheKey.Length)]);
+                    _cache.Remove(cacheKey); // Remove invalid cached response
+                    return null;
+                }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error retrieving cached response for key: {CacheKey}", cacheKey);
+            _logger.LogWarning(ex, "Error retrieving cached response for key: {CacheKey}, removing from cache", cacheKey);
+            _cache.Remove(cacheKey); // Remove corrupted cache entry
         }
 
         return null;
@@ -43,10 +55,11 @@ public class LLMCacheService : ILLMCacheService
     {
         try
         {
-            // Don't cache error responses
-            if (!response.Success)
+            // Only cache successful responses with content
+            if (!response.Success || string.IsNullOrWhiteSpace(response.Content))
             {
-                _logger.LogInformation("Skipping cache for failed response with key: {CacheKey}", cacheKey[..Math.Min(20, cacheKey.Length)]);
+                _logger.LogInformation("Skipping cache for invalid response: Success={Success}, ContentLength={Length}",
+                    response.Success, response.Content?.Length ?? 0);
                 return;
             }
 
@@ -59,7 +72,7 @@ public class LLMCacheService : ILLMCacheService
             };
 
             _cache.Set(cacheKey, json, cacheOptions);
-            _logger.LogInformation("Cached response for key: {CacheKey}", cacheKey[..Math.Min(20, cacheKey.Length)]);
+            _logger.LogInformation("Cached valid response for key: {CacheKey}", cacheKey[..Math.Min(20, cacheKey.Length)]);
         }
         catch (Exception ex)
         {
@@ -89,8 +102,31 @@ public class LLMCacheService : ILLMCacheService
     {
         if (_cache is MemoryCache memoryCache)
         {
-            memoryCache.Clear();
-            _logger.LogInformation("LLM cache cleared");
+            // Use reflection to clear the cache since MemoryCache doesn't expose a Clear method
+            var field = typeof(MemoryCache).GetField("_coherentState",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+            if (field?.GetValue(memoryCache) is object coherentState)
+            {
+                var entriesCollection = coherentState.GetType()
+                    .GetProperty("EntriesCollection", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                if (entriesCollection?.GetValue(coherentState) is System.Collections.IDictionary entries)
+                {
+                    var keysToRemove = new List<object>();
+                    foreach (System.Collections.DictionaryEntry entry in entries)
+                    {
+                        keysToRemove.Add(entry.Key);
+                    }
+
+                    foreach (var key in keysToRemove)
+                    {
+                        memoryCache.Remove(key);
+                    }
+
+                    _logger.LogInformation("Cleared {Count} cache entries", keysToRemove.Count);
+                }
+            }
         }
     }
 

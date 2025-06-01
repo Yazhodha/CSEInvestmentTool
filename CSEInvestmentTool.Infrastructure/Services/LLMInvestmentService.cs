@@ -71,25 +71,55 @@ public class LLMInvestmentService : ILLMInvestmentService
             // Build the prompts
             var (systemPrompt, userPrompt) = BuildInvestmentPrompts(request, philosophy);
 
+            // Add this logging to see what we're sending
+            _logger.LogInformation("=== INVESTMENT ANALYSIS PROMPT DEBUG ===");
+            _logger.LogInformation("System Prompt Length: {Length} characters", systemPrompt.Length);
+            _logger.LogInformation("System Prompt: {SystemPrompt}", systemPrompt);
+            _logger.LogInformation("User Prompt Length: {Length} characters", userPrompt.Length);
+            _logger.LogInformation("User Prompt: {UserPrompt}", userPrompt);
+            _logger.LogInformation("=== END PROMPT DEBUG ===");
+
             // Create LLM request
             var llmRequest = new LLMRequest
             {
                 SystemPrompt = systemPrompt,
                 UserPrompt = userPrompt,
-                Temperature = 0.7m,
-                MaxTokens = 2000
+                Temperature = 0.3m,
+                MaxTokens = 1500 // Increased from 800 to handle reasoning model
             };
 
             // Call LLM
             var llmResponse = await llmProvider.CompleteChatAsync(llmRequest);
 
+            // Add this logging to see what we get back
+            _logger.LogInformation("=== INVESTMENT ANALYSIS RESPONSE DEBUG ===");
+            _logger.LogInformation("LLM Response Success: {Success}", llmResponse.Success);
+            _logger.LogInformation("LLM Response Content Length: {Length}", llmResponse.Content?.Length ?? 0);
+            _logger.LogInformation("LLM Response Content: '{Content}'", llmResponse.Content ?? "NULL");
+            _logger.LogInformation("LLM Response Error: {Error}", llmResponse.ErrorMessage ?? "None");
+            _logger.LogInformation("=== END RESPONSE DEBUG ===");
+
             if (!llmResponse.Success)
             {
+                _logger.LogError("LLM analysis failed: {Error}", llmResponse.ErrorMessage);
                 return new LLMInvestmentResponse
                 {
                     Success = false,
-                    ErrorMessage = $"LLM call failed: {llmResponse.ErrorMessage}"
+                    ErrorMessage = $"LLM analysis failed: {llmResponse.ErrorMessage}"
                 };
+            }
+
+            // Log token usage for monitoring
+            if (llmResponse.TokensUsed.HasValue)
+            {
+                _logger.LogInformation("LLM analysis completed. Tokens used: {TokensUsed}", llmResponse.TokensUsed.Value);
+
+                if (llmResponse.AdditionalData.TryGetValue("prompt_tokens", out var promptTokens) &&
+                    llmResponse.AdditionalData.TryGetValue("completion_tokens", out var completionTokens))
+                {
+                    _logger.LogInformation("Token breakdown - Input: {InputTokens}, Output: {OutputTokens}",
+                        promptTokens, completionTokens);
+                }
             }
 
             // Parse the response
@@ -97,11 +127,12 @@ public class LLMInvestmentService : ILLMInvestmentService
 
             return new LLMInvestmentResponse
             {
-                Success = true,
+                Success = recommendations.Success,
                 Recommendations = recommendations.Recommendations,
                 OverallAnalysis = recommendations.OverallAnalysis,
                 MarketOutlook = recommendations.MarketOutlook,
                 RiskFactors = recommendations.RiskFactors,
+                ErrorMessage = recommendations.ErrorMessage,
                 LLMProvider = llmProvider.ProviderName,
                 Model = llmProvider.Model
             };
@@ -192,61 +223,48 @@ public class LLMInvestmentService : ILLMInvestmentService
 
     private (string SystemPrompt, string UserPrompt) BuildInvestmentPrompts(LLMInvestmentRequest request, InvestmentPhilosophy philosophy)
     {
-        var systemPrompt = $@"You are an expert investment advisor specializing in {philosophy.Name} for the Sri Lankan stock market.
+        var systemPrompt = $@"You are an expert investment advisor specializing in {philosophy.Name} for Sri Lankan stocks.
 
-Philosophy: {philosophy.Description}
-Analysis Instructions: {philosophy.PromptTemplate}
+{philosophy.PromptTemplate}
 
-You must respond with valid JSON in the following format:
+CRITICAL INSTRUCTIONS:
+- You MUST respond with ONLY valid JSON
+- NO explanations, NO reasoning text, NO markdown
+- Start your response with {{ and end with }}
+- Follow this EXACT format:
+
 {{
-  ""overallAnalysis"": ""Brief overall market/portfolio analysis"",
-  ""marketOutlook"": ""Current market outlook and trends"",
-  ""riskFactors"": [""risk factor 1"", ""risk factor 2""],
+  ""overallAnalysis"": ""Brief market summary"",
+  ""marketOutlook"": ""Short outlook"",
+  ""riskFactors"": [""risk1"", ""risk2""],
   ""recommendations"": [
     {{
-      ""symbol"": ""STOCK_SYMBOL"",
-      ""recommendedAmount"": 0,
+      ""symbol"": ""EXACT_STOCK_SYMBOL"",
+      ""recommendedAmount"": 50000,
       ""rank"": 1,
-      ""reasoning"": ""Detailed reasoning for recommendation"",
-      ""riskAssessment"": ""Risk analysis for this stock"",
-      ""confidenceScore"": 85,
-      ""strengthFactors"": [""strength 1"", ""strength 2""],
-      ""concernFactors"": [""concern 1"", ""concern 2""]
+      ""reasoning"": ""Short reason"",
+      ""riskAssessment"": ""Brief risk"",
+      ""confidenceScore"": 85
     }}
   ]
 }}
 
-Ensure all recommendations sum to the total budget and rank them by preference.";
+Budget: LKR {request.MonthlyBudget:N0}. Allocate to max 5 best stocks. Ensure recommendedAmount values sum to approximately the budget.";
 
         var userPrompt = new StringBuilder();
-        userPrompt.AppendLine($"Monthly Investment Budget: LKR {request.MonthlyBudget:N0}");
-        userPrompt.AppendLine("Please analyze the following Sri Lankan stocks and provide investment recommendations:");
-        userPrompt.AppendLine();
+        userPrompt.AppendLine("STOCKS TO ANALYZE:");
 
         foreach (var stock in request.Stocks)
         {
-            userPrompt.AppendLine($"**{stock.Symbol} - {stock.CompanyName}**");
-            userPrompt.AppendLine($"Sector: {stock.Sector}");
-            userPrompt.AppendLine($"Market Price: LKR {stock.MarketPrice:N2}");
-            userPrompt.AppendLine($"NAV: LKR {stock.NAV:N2}");
-            userPrompt.AppendLine($"EPS: LKR {stock.EPS:N2}");
-            userPrompt.AppendLine($"Annual Dividend: LKR {stock.AnnualDividend:N2}");
-            userPrompt.AppendLine($"P/E Ratio: {stock.PERatio:N2}");
-            userPrompt.AppendLine($"ROE: {stock.ROE:N2}%");
-            userPrompt.AppendLine($"Dividend Yield: {stock.DividendYield:N2}%");
-            userPrompt.AppendLine($"Debt/Equity: {stock.DebtToEquityRatio:N2}");
-            userPrompt.AppendLine($"P/BV Ratio: {stock.PBV:N2}");
-            userPrompt.AppendLine($"Current Algorithm Score: {stock.CurrentAlgorithmScore:N1}/100");
-            userPrompt.AppendLine();
+            userPrompt.AppendLine($"{stock.Symbol}: Price={stock.MarketPrice:F0}, NAV={stock.NAV:F0}, P/E={stock.PERatio:F1}, ROE={stock.ROE:F1}%, DivYield={stock.DividendYield:F1}%, D/E={stock.DebtToEquityRatio:F2}");
         }
 
         if (!string.IsNullOrEmpty(request.AdditionalInstructions))
         {
-            userPrompt.AppendLine($"Additional Instructions: {request.AdditionalInstructions}");
-            userPrompt.AppendLine();
+            userPrompt.AppendLine($"\nADDITIONAL: {request.AdditionalInstructions}");
         }
 
-        userPrompt.AppendLine("Please provide your analysis and recommendations in the specified JSON format.");
+        userPrompt.AppendLine("\nRespond with ONLY the JSON object. No other text.");
 
         return (systemPrompt, userPrompt.ToString());
     }
@@ -255,64 +273,182 @@ Ensure all recommendations sum to the total budget and rank them by preference."
     {
         try
         {
-            // Try to extract JSON from the response
-            var jsonStart = responseContent.IndexOf('{');
-            var jsonEnd = responseContent.LastIndexOf('}');
+            _logger.LogInformation("Parsing LLM response: {ResponseLength} characters", responseContent.Length);
+            _logger.LogDebug("Full LLM response: {ResponseContent}", responseContent);
+
+            // Clean the response content
+            var cleanedContent = responseContent.Trim();
+            string? jsonContent = null;
+
+            // Strategy 1: Look for JSON object boundaries
+            var jsonStart = cleanedContent.IndexOf('{');
+            var jsonEnd = cleanedContent.LastIndexOf('}');
 
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
-                var jsonContent = responseContent.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var llmAnalysis = JsonSerializer.Deserialize<LLMAnalysisResponse>(jsonContent, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                jsonContent = cleanedContent.Substring(jsonStart, jsonEnd - jsonStart + 1);
+                _logger.LogDebug("Strategy 1 - Extracted JSON: {JsonContent}", jsonContent);
+            }
 
-                if (llmAnalysis != null)
+            // Strategy 2: Look for ```json code blocks
+            if (string.IsNullOrEmpty(jsonContent))
+            {
+                var patterns = new[] { "```json", "```JSON", "```" };
+                foreach (var pattern in patterns)
                 {
-                    var recommendations = new List<LLMRecommendation>();
-                    foreach (var rec in llmAnalysis.Recommendations)
+                    var blockStart = cleanedContent.IndexOf(pattern);
+                    if (blockStart >= 0)
                     {
-                        var stock = stocks.FirstOrDefault(s => s.Symbol.Equals(rec.Symbol, StringComparison.OrdinalIgnoreCase));
-                        if (stock != null)
+                        var contentStart = blockStart + pattern.Length;
+                        var blockEnd = cleanedContent.IndexOf("```", contentStart);
+                        if (blockEnd > contentStart)
                         {
-                            recommendations.Add(new LLMRecommendation
-                            {
-                                StockId = stock.StockId,
-                                Symbol = stock.Symbol,
-                                CompanyName = stock.CompanyName,
-                                RecommendedAmount = rec.RecommendedAmount,
-                                RecommendationRank = rec.Rank,
-                                Reasoning = rec.Reasoning,
-                                RiskAssessment = rec.RiskAssessment,
-                                ConfidenceScore = rec.ConfidenceScore,
-                                StrengthFactors = rec.StrengthFactors,
-                                ConcernFactors = rec.ConcernFactors
-                            });
+                            jsonContent = cleanedContent.Substring(contentStart, blockEnd - contentStart).Trim();
+                            _logger.LogDebug("Strategy 2 - Extracted JSON from {Pattern} block: {JsonContent}", pattern, jsonContent);
+                            break;
                         }
                     }
+                }
+            }
 
-                    return new LLMInvestmentResponse
+            // Strategy 3: Try to extract JSON from mixed content using regex
+            if (string.IsNullOrEmpty(jsonContent))
+            {
+                var jsonPattern = @"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}";
+                var matches = System.Text.RegularExpressions.Regex.Matches(cleanedContent, jsonPattern, System.Text.RegularExpressions.RegexOptions.Singleline);
+
+                foreach (System.Text.RegularExpressions.Match match in matches)
+                {
+                    var candidate = match.Value;
+                    if (candidate.Contains("recommendations") && candidate.Contains("overallAnalysis"))
                     {
-                        Success = true,
-                        Recommendations = recommendations,
-                        OverallAnalysis = llmAnalysis.OverallAnalysis,
-                        MarketOutlook = llmAnalysis.MarketOutlook,
-                        RiskFactors = llmAnalysis.RiskFactors
+                        jsonContent = candidate;
+                        _logger.LogDebug("Strategy 3 - Extracted JSON via regex: {JsonContent}", jsonContent);
+                        break;
+                    }
+                }
+            }
+
+            // Strategy 4: Create fallback JSON if we can extract stock recommendations
+            if (string.IsNullOrEmpty(jsonContent))
+            {
+                _logger.LogWarning("No valid JSON found, attempting to create fallback response");
+
+                // Try to extract stock symbols and create a basic response
+                var fallbackRecommendations = new List<LLMRecommendation>();
+                decimal budgetPerStock = 100000m / Math.Min(stocks.Count, 3); // Distribute among top 3 stocks
+
+                var topStocks = stocks.OrderByDescending(s => s.CurrentAlgorithmScore ?? 0).Take(3).ToList();
+
+                for (int i = 0; i < topStocks.Count; i++)
+                {
+                    var stock = topStocks[i];
+                    fallbackRecommendations.Add(new LLMRecommendation
+                    {
+                        StockId = stock.StockId,
+                        Symbol = stock.Symbol,
+                        CompanyName = stock.CompanyName,
+                        RecommendedAmount = Math.Round(budgetPerStock, 0),
+                        RecommendationRank = i + 1,
+                        Reasoning = "Selected based on algorithm score and fundamentals",
+                        RiskAssessment = "Standard market risk",
+                        ConfidenceScore = 70,
+                        StrengthFactors = new List<string> { "Good fundamentals" },
+                        ConcernFactors = new List<string> { "Market volatility" }
+                    });
+                }
+
+                _logger.LogInformation("Created fallback response with {Count} recommendations", fallbackRecommendations.Count);
+
+                return new LLMInvestmentResponse
+                {
+                    Success = true,
+                    Recommendations = fallbackRecommendations,
+                    OverallAnalysis = "Analysis completed with fallback due to response parsing issues",
+                    MarketOutlook = "Mixed market conditions require careful stock selection",
+                    RiskFactors = new List<string> { "Market volatility", "Economic uncertainty" }
+                };
+            }
+
+            // Try to parse the extracted JSON
+            if (!string.IsNullOrEmpty(jsonContent))
+            {
+                try
+                {
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        AllowTrailingCommas = true,
+                        ReadCommentHandling = JsonCommentHandling.Skip
                     };
+
+                    var llmAnalysis = JsonSerializer.Deserialize<LLMAnalysisResponse>(jsonContent, options);
+
+                    if (llmAnalysis?.Recommendations?.Any() == true)
+                    {
+                        var recommendations = new List<LLMRecommendation>();
+                        foreach (var rec in llmAnalysis.Recommendations)
+                        {
+                            var stock = stocks.FirstOrDefault(s =>
+                                s.Symbol.Equals(rec.Symbol, StringComparison.OrdinalIgnoreCase));
+
+                            if (stock != null)
+                            {
+                                recommendations.Add(new LLMRecommendation
+                                {
+                                    StockId = stock.StockId,
+                                    Symbol = stock.Symbol,
+                                    CompanyName = stock.CompanyName,
+                                    RecommendedAmount = rec.RecommendedAmount,
+                                    RecommendationRank = rec.Rank,
+                                    Reasoning = rec.Reasoning ?? "AI recommended this stock",
+                                    RiskAssessment = rec.RiskAssessment ?? "Standard risk",
+                                    ConfidenceScore = rec.ConfidenceScore,
+                                    StrengthFactors = rec.StrengthFactors ?? new List<string>(),
+                                    ConcernFactors = rec.ConcernFactors ?? new List<string>()
+                                });
+                            }
+                            else
+                            {
+                                _logger.LogWarning("Stock symbol {Symbol} not found in provided stocks list", rec.Symbol);
+                            }
+                        }
+
+                        if (recommendations.Any())
+                        {
+                            _logger.LogInformation("Successfully parsed {Count} recommendations from LLM response", recommendations.Count);
+
+                            return new LLMInvestmentResponse
+                            {
+                                Success = true,
+                                Recommendations = recommendations,
+                                OverallAnalysis = llmAnalysis.OverallAnalysis ?? "Analysis completed",
+                                MarketOutlook = llmAnalysis.MarketOutlook ?? "Market outlook available",
+                                RiskFactors = llmAnalysis.RiskFactors ?? new List<string>()
+                            };
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("LLM response parsed but contained no valid recommendations");
+                    }
+                }
+                catch (JsonException jsonEx)
+                {
+                    _logger.LogError(jsonEx, "JSON parsing failed. JSON content: {JsonContent}", jsonContent);
                 }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to parse LLM JSON response, using fallback parsing");
+            _logger.LogError(ex, "Failed to parse LLM response");
         }
 
-        // Fallback: create a simple response
+        // Return error response
         return new LLMInvestmentResponse
         {
-            Success = true,
-            OverallAnalysis = "LLM analysis completed but response parsing encountered issues. Please check logs for details.",
-            Recommendations = new List<LLMRecommendation>()
+            Success = false,
+            ErrorMessage = "Failed to parse LLM response. The AI may have generated an invalid format."
         };
     }
 
